@@ -22,7 +22,7 @@ func doWriteCmd(cmd *cobra.Command, args []string) {
 	appID, key, value := args[0], args[1], args[2]
 	log.Trace().Str("appID", appID).Str("key", key).Str("value", value).Msg("Writing preference")
 
-	err := cfprefs.SetStr(appID, key, value)
+	err := cfprefs.Set(appID, key, value)
 
 	if err == nil {
 		log.Info().Str("app", appID).Str("key", key).Str("value", value).Msg("Value saved successfully")

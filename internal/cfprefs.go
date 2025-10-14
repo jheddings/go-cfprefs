@@ -1,6 +1,6 @@
 package internal
 
-// TODO fail gracefully if the framework is not available (e.g. non-macOS)
+// This file contains the public API operations for CoreFoundation preferences.
 
 import (
 	"fmt"
@@ -10,30 +10,15 @@ import (
 /*
 #cgo LDFLAGS: -framework CoreFoundation
 #include <CoreFoundation/CoreFoundation.h>
+#include <stdlib.h>
 
-CFStringRef createCFString(const char *str) {
-    return CFStringCreateWithCString(kCFAllocatorDefault, str, kCFStringEncodingUTF8);
-}
-
-char* cfStringToC(CFStringRef str) {
-    if (str == NULL) return NULL;
-
-    CFIndex length = CFStringGetLength(str);
-    CFIndex maxSize = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
-    char *buffer = (char *)malloc(maxSize);
-
-    if (CFStringGetCString(str, buffer, maxSize, kCFStringEncodingUTF8)) {
-        return buffer;
-    }
-
-    free(buffer);
-    return NULL;
-}
+// Forward declarations of helper functions
+extern CFStringRef createCFString(const char *str);
 */
 import "C"
 
-// Get a preference value for the given key, appID.
-func Get(appID, key string) (string, error) {
+// Get retrieves a preference value for the given key and appID.
+func Get(appID, key string) (any, error) {
 	appIDRef := C.createCFString(C.CString(appID))
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
@@ -42,36 +27,38 @@ func Get(appID, key string) (string, error) {
 
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
 	if unsafe.Pointer(value) == nil {
-		return "", fmt.Errorf("key not found: %s [%s]", key, appID)
+		return nil, fmt.Errorf("key not found: %s [%s]", key, appID)
 	}
 	defer C.CFRelease(value)
 
-	// Check if the value is a string
-	if C.CFGetTypeID(value) == C.CFStringGetTypeID() {
-		strValue := C.CFStringRef(value)
-		cStr := C.cfStringToC(strValue)
-		if cStr == nil {
-			return "", fmt.Errorf("failed to convert CFString to C string")
-		}
-		defer C.free(unsafe.Pointer(cStr))
-		return C.GoString(cStr), nil
+	// Convert the CFType to a native Go type
+	goValue, err := convertCFTypeToGo(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert preference value: %w", err)
 	}
 
-	return "", fmt.Errorf("preference value is not a string")
+	return goValue, nil
 }
 
-// Set a preference value for the given key, appID.
-func Set(appID, key, value string) error {
+// Set updates a preference value for the given key and appID.
+func Set(appID, key string, value any) error {
 	appIDRef := C.createCFString(C.CString(appID))
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
 	keyRef := C.createCFString(C.CString(key))
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
-	valueRef := C.createCFString(C.CString(value))
-	defer C.CFRelease(C.CFTypeRef(valueRef))
+	valueRef, err := convertGoToCFType(value)
+	if err != nil {
+		return fmt.Errorf("failed to convert value: %w", err)
+	}
+	defer func() {
+		if unsafe.Pointer(valueRef) != nil {
+			C.CFRelease(valueRef)
+		}
+	}()
 
-	C.CFPreferencesSetAppValue(keyRef, C.CFTypeRef(valueRef), appIDRef)
+	C.CFPreferencesSetAppValue(keyRef, valueRef, appIDRef)
 
 	// Synchronize to ensure the change is written
 	success := C.CFPreferencesAppSynchronize(appIDRef)
@@ -82,7 +69,7 @@ func Set(appID, key, value string) error {
 	return nil
 }
 
-// Delete a preference value for the given key, appID.
+// Delete removes a preference value for the given key and appID.
 func Delete(appID, key string) error {
 	appIDRef := C.createCFString(C.CString(appID))
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
@@ -101,4 +88,21 @@ func Delete(appID, key string) error {
 	}
 
 	return nil
+}
+
+// Exists checks if a key exists for the given appID.
+func Exists(appID, key string) (bool, error) {
+	appIDRef := C.createCFString(C.CString(appID))
+	defer C.CFRelease(C.CFTypeRef(appIDRef))
+
+	keyRef := C.createCFString(C.CString(key))
+	defer C.CFRelease(C.CFTypeRef(keyRef))
+
+	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
+	if unsafe.Pointer(value) == nil {
+		return false, nil
+	}
+	defer C.CFRelease(value)
+
+	return true, nil
 }
