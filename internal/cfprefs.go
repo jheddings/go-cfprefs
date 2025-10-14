@@ -3,13 +3,16 @@ package internal
 // TODO fail gracefully if the framework is not available (e.g. non-macOS)
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 	"unsafe"
 )
 
 /*
 #cgo LDFLAGS: -framework CoreFoundation
 #include <CoreFoundation/CoreFoundation.h>
+#include <stdlib.h>
 
 CFStringRef createCFString(const char *str) {
     return CFStringCreateWithCString(kCFAllocatorDefault, str, kCFStringEncodingUTF8);
@@ -29,11 +32,238 @@ char* cfStringToC(CFStringRef str) {
     free(buffer);
     return NULL;
 }
+
+Boolean getCFBoolean(CFBooleanRef boolRef) {
+    return CFBooleanGetValue(boolRef);
+}
+
+int64_t getCFNumberAsInt64(CFNumberRef numRef) {
+    int64_t value = 0;
+    CFNumberGetValue(numRef, kCFNumberLongLongType, &value);
+    return value;
+}
+
+double getCFNumberAsFloat64(CFNumberRef numRef) {
+    double value = 0;
+    CFNumberGetValue(numRef, kCFNumberDoubleType, &value);
+    return value;
+}
+
+Boolean isCFNumberFloat(CFNumberRef numRef) {
+    CFNumberType type = CFNumberGetType(numRef);
+    return (type == kCFNumberFloatType ||
+            type == kCFNumberDoubleType ||
+            type == kCFNumberFloat32Type ||
+            type == kCFNumberFloat64Type);
+}
+
+CFIndex getCFArrayCount(CFArrayRef arr) {
+    return CFArrayGetCount(arr);
+}
+
+CFTypeRef getCFArrayValueAtIndex(CFArrayRef arr, CFIndex idx) {
+    return CFArrayGetValueAtIndex(arr, idx);
+}
+
+CFIndex getCFDictionaryCount(CFDictionaryRef dict) {
+    return CFDictionaryGetCount(dict);
+}
+
+void getCFDictionaryKeys(CFDictionaryRef dict, const void **keys) {
+    CFDictionaryGetKeysAndValues(dict, keys, NULL);
+}
+
+CFTypeRef getCFDictionaryValue(CFDictionaryRef dict, CFStringRef key) {
+    return CFDictionaryGetValue(dict, key);
+}
+
+const uint8_t* getCFDataBytes(CFDataRef data) {
+    return CFDataGetBytePtr(data);
+}
+
+CFIndex getCFDataLength(CFDataRef data) {
+    return CFDataGetLength(data);
+}
+
+CFAbsoluteTime getCFDateAbsoluteTime(CFDateRef date) {
+    return CFDateGetAbsoluteTime(date);
+}
+
+// Try to deserialize CFData as property list
+CFPropertyListRef tryDeserializePlist(CFDataRef data) {
+    CFErrorRef error = NULL;
+    CFPropertyListRef plist = CFPropertyListCreateWithData(
+        kCFAllocatorDefault,
+        data,
+        kCFPropertyListImmutable,
+        NULL,
+        &error
+    );
+
+    if (error) {
+        CFRelease(error);
+        return NULL;
+    }
+
+    return plist;
+}
 */
 import "C"
 
+// converts a CFTypeRef to a native Go type
+func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
+	if unsafe.Pointer(cfValue) == nil {
+		return nil, nil
+	}
+
+	typeID := C.CFGetTypeID(cfValue)
+
+	switch typeID {
+	case C.CFStringGetTypeID():
+		return convertCFString(C.CFStringRef(cfValue))
+
+	case C.CFNumberGetTypeID():
+		return convertCFNumber(C.CFNumberRef(cfValue))
+
+	case C.CFBooleanGetTypeID():
+		return convertCFBoolean(C.CFBooleanRef(cfValue)), nil
+
+	case C.CFArrayGetTypeID():
+		return convertCFArray(C.CFArrayRef(cfValue))
+
+	case C.CFDictionaryGetTypeID():
+		return convertCFDictionary(C.CFDictionaryRef(cfValue))
+
+	case C.CFDataGetTypeID():
+		return convertCFData(C.CFDataRef(cfValue)), nil
+
+	case C.CFDateGetTypeID():
+		return convertCFDate(C.CFDateRef(cfValue)), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported CFType: %v", typeID)
+	}
+}
+
+// converts a CFStringRef to a Go string
+func convertCFString(strRef C.CFStringRef) (string, error) {
+	cStr := C.cfStringToC(strRef)
+	if cStr == nil {
+		return "", fmt.Errorf("failed to convert CFString to C string")
+	}
+	defer C.free(unsafe.Pointer(cStr))
+	return C.GoString(cStr), nil
+}
+
+// converts a CFNumberRef to either int64 or float64
+func convertCFNumber(numRef C.CFNumberRef) (any, error) {
+	if C.isCFNumberFloat(numRef) != 0 {
+		return float64(C.getCFNumberAsFloat64(numRef)), nil
+	}
+	return int64(C.getCFNumberAsInt64(numRef)), nil
+}
+
+// converts a CFBooleanRef to a Go bool
+func convertCFBoolean(boolRef C.CFBooleanRef) bool {
+	return C.getCFBoolean(boolRef) != 0
+}
+
+// converts a CFArrayRef to a Go slice
+func convertCFArray(arrRef C.CFArrayRef) ([]any, error) {
+	count := int(C.getCFArrayCount(arrRef))
+	result := make([]any, count)
+
+	for i := range count {
+		cfValue := C.getCFArrayValueAtIndex(arrRef, C.CFIndex(i))
+		value, err := convertCFTypeToGo(cfValue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+		}
+		result[i] = value
+	}
+
+	return result, nil
+}
+
+// converts a CFDictionaryRef to a Go map
+func convertCFDictionary(dictRef C.CFDictionaryRef) (map[string]any, error) {
+	count := int(C.getCFDictionaryCount(dictRef))
+	if count == 0 {
+		return make(map[string]any), nil
+	}
+
+	// Allocate space for keys
+	keys := make([]unsafe.Pointer, count)
+	C.getCFDictionaryKeys(dictRef, (*unsafe.Pointer)(unsafe.Pointer(&keys[0])))
+
+	result := make(map[string]any, count)
+
+	for i := range count {
+		keyRef := C.CFStringRef(keys[i])
+		keyStr, err := convertCFString(keyRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert dictionary key: %w", err)
+		}
+
+		valueRef := C.getCFDictionaryValue(dictRef, keyRef)
+		value, err := convertCFTypeToGo(valueRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert dictionary value for key '%s': %w", keyStr, err)
+		}
+
+		result[keyStr] = value
+	}
+
+	return result, nil
+}
+
+// converts a CFDataRef to a Go value, attempting to deserialize if it's JSON or plist
+func convertCFData(dataRef C.CFDataRef) any {
+	length := int(C.getCFDataLength(dataRef))
+	if length == 0 {
+		return []byte{}
+	}
+
+	bytes := C.getCFDataBytes(dataRef)
+	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
+
+	// First, try to deserialize as property list
+	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
+		defer C.CFRelease(C.CFTypeRef(plist))
+		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
+			return value
+		}
+	}
+
+	// Next, try to deserialize as JSON
+	var jsonValue any
+	if err := json.Unmarshal(data, &jsonValue); err == nil {
+		return jsonValue
+	}
+
+	// If neither worked, return as raw bytes
+	return data
+}
+
+// converts a CFDateRef to a Go time.Time
+func convertCFDate(dateRef C.CFDateRef) time.Time {
+	// CFAbsoluteTime is seconds since Jan 1, 2001 00:00:00 GMT
+	// Unix epoch is Jan 1, 1970 00:00:00 GMT
+	// Difference is 31 years = 978307200 seconds
+	// FIXME: perform the calculation instead of using a constant
+	const cfAbsoluteTimeIntervalSince1970 = 978307200.0
+
+	absoluteTime := float64(C.getCFDateAbsoluteTime(dateRef))
+	unixTime := absoluteTime + cfAbsoluteTimeIntervalSince1970
+
+	seconds := int64(unixTime)
+	nanoseconds := int64((unixTime - float64(seconds)) * 1e9)
+
+	return time.Unix(seconds, nanoseconds)
+}
+
 // Get a preference value for the given key, appID.
-func Get(appID, key string) (string, error) {
+func Get(appID, key string) (any, error) {
 	appIDRef := C.createCFString(C.CString(appID))
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
@@ -42,22 +272,17 @@ func Get(appID, key string) (string, error) {
 
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
 	if unsafe.Pointer(value) == nil {
-		return "", fmt.Errorf("key not found: %s [%s]", key, appID)
+		return nil, fmt.Errorf("key not found: %s [%s]", key, appID)
 	}
 	defer C.CFRelease(value)
 
-	// Check if the value is a string
-	if C.CFGetTypeID(value) == C.CFStringGetTypeID() {
-		strValue := C.CFStringRef(value)
-		cStr := C.cfStringToC(strValue)
-		if cStr == nil {
-			return "", fmt.Errorf("failed to convert CFString to C string")
-		}
-		defer C.free(unsafe.Pointer(cStr))
-		return C.GoString(cStr), nil
+	// Convert the CFType to a native Go type
+	goValue, err := convertCFTypeToGo(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert preference value: %w", err)
 	}
 
-	return "", fmt.Errorf("preference value is not a string")
+	return goValue, nil
 }
 
 // Set a preference value for the given key, appID.

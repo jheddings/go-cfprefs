@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/jheddings/go-cfprefs"
@@ -23,13 +24,18 @@ func doReadCmd(cmd *cobra.Command, args []string) {
 	appID, key := args[0], args[1]
 	log.Trace().Str("app", appID).Str("key", key).Msg("Reading preference")
 
-	value, err := cfprefs.GetStr(appID, key)
+	value, err := cfprefs.Get(appID, key)
 
 	if err == nil {
-		log.Info().Str("app", appID).Str("key", key).Str("value", value).Msg("Value read successfully")
+		log.Info().Str("app", appID).Str("key", key).Type("type", value).Msg("Value read successfully")
 	} else {
 		log.Fatal().Err(err).Msg("Failed to read preference value")
 	}
 
-	fmt.Println(value)
+	jsonBytes, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to marshal value to JSON")
+	}
+
+	fmt.Println(string(jsonBytes))
 }
