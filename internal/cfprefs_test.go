@@ -5,19 +5,17 @@ import (
 	"time"
 )
 
-const testingDoCleanup = false
-
 func TestBasicStr(t *testing.T) {
 	dateTime := time.Now().Format(time.RFC3339)
 	t.Log(dateTime)
 
-	err := Set("com.jheddings.cfprefs.testing", "str-test", dateTime)
+	err := Set("com.jheddings.cfprefs.testing", "str", dateTime)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "str-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "str")
 
 	if err != nil {
 		t.Fatal(err)
@@ -26,27 +24,19 @@ func TestBasicStr(t *testing.T) {
 	if value != dateTime {
 		t.Fatal("value does not match")
 	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "str-test")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestBasicInt(t *testing.T) {
 	number := 1234567890
 	t.Log(number)
 
-	err := Set("com.jheddings.cfprefs.testing", "int-test", number)
+	err := Set("com.jheddings.cfprefs.testing", "int", number)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "int-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "int")
 
 	if err != nil {
 		t.Fatal(err)
@@ -55,26 +45,18 @@ func TestBasicInt(t *testing.T) {
 	if value != int64(number) {
 		t.Fatalf("value does not match: expected %d, got %v", number, value)
 	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "int-test")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestBasicBool(t *testing.T) {
 	testValue := true
 
-	err := Set("com.jheddings.cfprefs.testing", "bool-test", testValue)
+	err := Set("com.jheddings.cfprefs.testing", "bool", testValue)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "bool-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "bool")
 
 	if err != nil {
 		t.Fatal(err)
@@ -83,26 +65,18 @@ func TestBasicBool(t *testing.T) {
 	if value != testValue {
 		t.Fatalf("value does not match: expected %v, got %v", testValue, value)
 	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "bool-test")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestBasicFloat(t *testing.T) {
 	testValue := 3.14159265
 
-	err := Set("com.jheddings.cfprefs.testing", "float-test", testValue)
+	err := Set("com.jheddings.cfprefs.testing", "float", testValue)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "float-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "float")
 
 	if err != nil {
 		t.Fatal(err)
@@ -111,26 +85,18 @@ func TestBasicFloat(t *testing.T) {
 	if value != testValue {
 		t.Fatalf("value does not match: expected %f, got %v", testValue, value)
 	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "float-test")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestBasicTime(t *testing.T) {
 	testValue := time.Now()
 
-	err := Set("com.jheddings.cfprefs.testing", "time-test", testValue)
+	err := Set("com.jheddings.cfprefs.testing", "time", testValue)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "time-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "time")
 
 	if err != nil {
 		t.Fatal(err)
@@ -149,26 +115,18 @@ func TestBasicTime(t *testing.T) {
 	if diff > time.Second {
 		t.Fatalf("time does not match: expected %v, got %v", testValue, retrievedTime)
 	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "time-test")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestBasicBytes(t *testing.T) {
 	testValue := []byte("hello world")
 
-	err := Set("com.jheddings.cfprefs.testing", "bytes-test", testValue)
+	err := Set("com.jheddings.cfprefs.testing", "bytes", testValue)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "bytes-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "bytes")
 
 	if err != nil {
 		t.Fatal(err)
@@ -182,26 +140,18 @@ func TestBasicBytes(t *testing.T) {
 	if string(retrievedBytes) != string(testValue) {
 		t.Fatalf("value does not match: expected %s, got %s", testValue, retrievedBytes)
 	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "bytes-test")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestBasicArray(t *testing.T) {
 	testValue := []any{"hello", int64(42), 3.14, true}
 
-	err := Set("com.jheddings.cfprefs.testing", "array-test", testValue)
+	err := Set("com.jheddings.cfprefs.testing", "array", testValue)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "array-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "array")
 
 	if err != nil {
 		t.Fatal(err)
@@ -221,14 +171,6 @@ func TestBasicArray(t *testing.T) {
 			t.Fatalf("array element %d does not match: expected %v, got %v", i, v, retrievedArray[i])
 		}
 	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "array-test")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestBasicMap(t *testing.T) {
@@ -239,13 +181,13 @@ func TestBasicMap(t *testing.T) {
 		"bool":   true,
 	}
 
-	err := Set("com.jheddings.cfprefs.testing", "map-test", testValue)
+	err := Set("com.jheddings.cfprefs.testing", "map", testValue)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	value, err := Get("com.jheddings.cfprefs.testing", "map-test")
+	value, err := Get("com.jheddings.cfprefs.testing", "map")
 
 	if err != nil {
 		t.Fatal(err)
@@ -263,14 +205,6 @@ func TestBasicMap(t *testing.T) {
 	for k, v := range testValue {
 		if retrievedMap[k] != v {
 			t.Fatalf("map value for key %s does not match: expected %v, got %v", k, v, retrievedMap[k])
-		}
-	}
-
-	if testingDoCleanup {
-		err = Delete("com.jheddings.cfprefs.testing", "map-test")
-
-		if err != nil {
-			t.Fatal(err)
 		}
 	}
 }
