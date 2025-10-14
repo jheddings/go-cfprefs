@@ -89,9 +89,9 @@ CFAbsoluteTime getCFDateAbsoluteTime(CFDateRef date) {
     return CFDateGetAbsoluteTime(date);
 }
 
-// Try to deserialize CFData as property list
 CFPropertyListRef tryDeserializePlist(CFDataRef data) {
     CFErrorRef error = NULL;
+
     CFPropertyListRef plist = CFPropertyListCreateWithData(
         kCFAllocatorDefault,
         data,
@@ -134,11 +134,11 @@ func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
 	case C.CFDictionaryGetTypeID():
 		return convertCFDictionary(C.CFDictionaryRef(cfValue))
 
-	case C.CFDataGetTypeID():
-		return convertCFData(C.CFDataRef(cfValue)), nil
-
 	case C.CFDateGetTypeID():
 		return convertCFDate(C.CFDateRef(cfValue)), nil
+
+	case C.CFDataGetTypeID():
+		return convertCFData(C.CFDataRef(cfValue)), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported CFType: %v", typeID)
@@ -149,7 +149,7 @@ func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
 func convertCFString(strRef C.CFStringRef) (string, error) {
 	cStr := C.cfStringToC(strRef)
 	if cStr == nil {
-		return "", fmt.Errorf("failed to convert CFString to C string")
+		return "", fmt.Errorf("failed to convert CFString")
 	}
 	defer C.free(unsafe.Pointer(cStr))
 	return C.GoString(cStr), nil
