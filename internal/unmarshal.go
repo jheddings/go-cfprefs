@@ -60,16 +60,16 @@ CFTypeRef getCFDictionaryValue(CFDictionaryRef dict, CFStringRef key) {
     return CFDictionaryGetValue(dict, key);
 }
 
+CFAbsoluteTime getCFDateAbsoluteTime(CFDateRef date) {
+    return CFDateGetAbsoluteTime(date);
+}
+
 const uint8_t* getCFDataBytes(CFDataRef data) {
     return CFDataGetBytePtr(data);
 }
 
 CFIndex getCFDataLength(CFDataRef data) {
     return CFDataGetLength(data);
-}
-
-CFAbsoluteTime getCFDateAbsoluteTime(CFDateRef date) {
-    return CFDateGetAbsoluteTime(date);
 }
 
 CFPropertyListRef tryDeserializePlist(CFDataRef data) {
