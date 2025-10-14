@@ -192,10 +192,8 @@ func convertCFDictionary(dictRef C.CFDictionaryRef) (map[string]any, error) {
 		return make(map[string]any), nil
 	}
 
-	// Allocate space for keys
 	keys := make([]unsafe.Pointer, count)
 	C.getCFDictionaryKeys(dictRef, (*unsafe.Pointer)(unsafe.Pointer(&keys[0])))
-
 	result := make(map[string]any, count)
 
 	for i := range count {
@@ -217,7 +215,7 @@ func convertCFDictionary(dictRef C.CFDictionaryRef) (map[string]any, error) {
 	return result, nil
 }
 
-// converts a CFDataRef to a Go value, attempting to deserialize if it's JSON or plist
+// converts a complex CFDataRef to a Go value
 func convertCFData(dataRef C.CFDataRef) any {
 	length := int(C.getCFDataLength(dataRef))
 	if length == 0 {
@@ -227,7 +225,7 @@ func convertCFData(dataRef C.CFDataRef) any {
 	bytes := C.getCFDataBytes(dataRef)
 	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
 
-	// First, try to deserialize as property list
+	// first, try to deserialize as property list
 	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
 		defer C.CFRelease(C.CFTypeRef(plist))
 		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
@@ -235,13 +233,13 @@ func convertCFData(dataRef C.CFDataRef) any {
 		}
 	}
 
-	// Next, try to deserialize as JSON
+	// next, try to deserialize as JSON
 	var jsonValue any
 	if err := json.Unmarshal(data, &jsonValue); err == nil {
 		return jsonValue
 	}
 
-	// If neither worked, return as raw bytes
+	// neither worked... return as raw bytes
 	return data
 }
 
@@ -326,4 +324,21 @@ func Delete(appID, key string) error {
 	}
 
 	return nil
+}
+
+// Exists checks if a key exists for the given appID.
+func Exists(appID, key string) (bool, error) {
+	appIDRef := C.createCFString(C.CString(appID))
+	defer C.CFRelease(C.CFTypeRef(appIDRef))
+
+	keyRef := C.createCFString(C.CString(key))
+	defer C.CFRelease(C.CFTypeRef(keyRef))
+
+	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
+	if unsafe.Pointer(value) == nil {
+		return false, nil
+	}
+	defer C.CFRelease(value)
+
+	return true, nil
 }
