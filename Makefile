@@ -24,6 +24,7 @@ all: build
 
 .PHONY: init
 init:
+	mkdir -p "$(SRCDIR)/tmp"
 	cd $(SRCDIR) && go mod download
 	cd $(SRCDIR) && go mod tidy
 
@@ -43,7 +44,12 @@ build-cli: init
 
 .PHONY: unit-test
 unit-test: init
-	cd $(SRCDIR) && go test -v ./...
+	cd $(SRCDIR) && go test -v -coverprofile=tmp/coverage.out ./...
+
+
+.PHONY: test
+test: unit-test
+	cd $(SRCDIR) && go tool cover -func=tmp/coverage.out
 
 
 .PHONY: static-checks
