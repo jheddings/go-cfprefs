@@ -12,21 +12,15 @@ import (
 // nested dictionaries. For example, "map-test/string" will retrieve the
 // "string" key from the "map-test" dictionary.
 func Get(appID, key string) (any, error) {
-	// Split the key into path segments
 	segments := strings.Split(key, "/")
 
-	// Get the root value from preferences
+	// start with the root value
 	value, err := internal.Get(appID, segments[0])
 	if err != nil {
 		return nil, err
 	}
 
-	// If there's only one segment, return the value directly
-	if len(segments) == 1 {
-		return value, nil
-	}
-
-	// Traverse through the remaining path segments
+	// traverse the remaining path segments
 	for i := 1; i < len(segments); i++ {
 		// Current value must be a map to traverse further
 		dict, ok := value.(map[string]any)
