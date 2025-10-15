@@ -8,11 +8,8 @@ import (
 )
 
 // Get retrieves a preference value for the given key and application ID.
-// The key may be a keypath separated by forward slashes ("/") to traverse
-// nested dictionaries. For example, "map-test/string" will retrieve the
-// "string" key from the "map-test" dictionary.
-func Get(appID, key string) (any, error) {
-	segments := strings.Split(key, "/")
+func Get(appID, keypath string) (any, error) {
+	segments := strings.Split(keypath, "/")
 
 	// start with the root value
 	value, err := internal.Get(appID, segments[0])
@@ -26,14 +23,14 @@ func Get(appID, key string) (any, error) {
 		dict, ok := value.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' is not a dictionary",
-				key, appID, segments[i-1])
+				keypath, appID, segments[i-1])
 		}
 
 		// Get the next value from the dictionary
 		value, ok = dict[segments[i]]
 		if !ok {
 			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' not found in dictionary",
-				key, appID, segments[i])
+				keypath, appID, segments[i])
 		}
 	}
 
@@ -41,8 +38,8 @@ func Get(appID, key string) (any, error) {
 }
 
 // GetStr retrieves a string preference value for the given key and application ID.
-func GetStr(appID, key string) (string, error) {
-	value, err := Get(appID, key)
+func GetStr(appID, keypath string) (string, error) {
+	value, err := Get(appID, keypath)
 	if err != nil {
 		return "", err
 	}
@@ -56,8 +53,8 @@ func GetStr(appID, key string) (string, error) {
 }
 
 // GetInt retrieves an integer preference value for the given key and application ID.
-func GetInt(appID, key string) (int64, error) {
-	value, err := Get(appID, key)
+func GetInt(appID, keypath string) (int64, error) {
+	value, err := Get(appID, keypath)
 	if err != nil {
 		return 0, err
 	}
@@ -71,8 +68,8 @@ func GetInt(appID, key string) (int64, error) {
 }
 
 // GetBool retrieves a boolean preference value for the given key and application ID.
-func GetBool(appID, key string) (bool, error) {
-	value, err := Get(appID, key)
+func GetBool(appID, keypath string) (bool, error) {
+	value, err := Get(appID, keypath)
 	if err != nil {
 		return false, err
 	}
@@ -86,8 +83,8 @@ func GetBool(appID, key string) (bool, error) {
 }
 
 // GetFloat retrieves a float preference value for the given key and application ID.
-func GetFloat(appID, key string) (float64, error) {
-	value, err := Get(appID, key)
+func GetFloat(appID, keypath string) (float64, error) {
+	value, err := Get(appID, keypath)
 	if err != nil {
 		return 0.0, err
 	}

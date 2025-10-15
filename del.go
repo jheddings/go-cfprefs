@@ -7,7 +7,7 @@ import (
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
-// Delete removes a preference value for the given key and application ID.
+// Removes a preference key for the given application ID
 func Delete(appID, keypath string) error {
 	segments := strings.Split(keypath, "/")
 
