@@ -11,9 +11,14 @@ import (
 
 var deleteCmd = &cobra.Command{
 	Use:   "delete <appID> <key>",
-	Short: "Delete a preference key",
-	Args:  cobra.ExactArgs(2),
-	Run:   doDeleteCmd,
+	Short: "Delete a preference key (supports keypaths with '/' separator)",
+	Long: `Delete a preference key for the specified application ID.
+
+The key may be a keypath separated by forward slashes ("/") to delete values
+from nested dictionaries. For example, "settings/display/brightness" will delete
+the "brightness" key from the nested structure while preserving parent dictionaries.`,
+	Args: cobra.ExactArgs(2),
+	Run:  doDeleteCmd,
 }
 
 func init() {

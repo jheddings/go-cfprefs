@@ -11,9 +11,14 @@ import (
 
 var readCmd = &cobra.Command{
 	Use:   "read <appID> <key>",
-	Short: "Read a preference value",
-	Args:  cobra.ExactArgs(2),
-	Run:   doReadCmd,
+	Short: "Read a preference value (supports keypaths with '/' separator)",
+	Long: `Read a preference value for the specified application ID.
+
+The key may be a keypath separated by forward slashes ("/") to traverse nested
+dictionaries. For example, "settings/display/brightness" will retrieve the
+"brightness" value from the nested structure.`,
+	Args: cobra.ExactArgs(2),
+	Run:  doReadCmd,
 }
 
 func init() {

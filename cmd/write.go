@@ -20,9 +20,15 @@ var (
 
 var writeCmd = &cobra.Command{
 	Use:   "write <appID> <key> <value>",
-	Short: "Write a preference value",
-	Args:  cobra.ExactArgs(3),
-	Run:   doWriteCmd,
+	Short: "Write a preference value (supports keypaths with '/' separator)",
+	Long: `Write a preference value for the specified application ID.
+
+The key may be a keypath separated by forward slashes ("/") to set values in
+nested dictionaries. For example, "settings/display/brightness" will set the
+"brightness" value in the nested structure, creating intermediate dictionaries
+as needed.`,
+	Args: cobra.ExactArgs(3),
+	Run:  doWriteCmd,
 }
 
 func init() {

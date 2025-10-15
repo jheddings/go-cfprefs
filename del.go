@@ -8,19 +8,14 @@ import (
 )
 
 // Delete removes a preference value for the given key and application ID.
-// The key may be a keypath separated by forward slashes ("/") to traverse
-// nested dictionaries. For example, "map-test/string" will delete the "string"
-// key from the "map-test" dictionary while preserving the parent dictionary
-// and any other keys within it.
-func Delete(appID, key string) error {
-	segments := strings.Split(key, "/")
+func Delete(appID, keypath string) error {
+	segments := strings.Split(keypath, "/")
 
 	// if there's only one segment, delete directly
 	if len(segments) == 1 {
-		return internal.Delete(appID, key)
+		return internal.Delete(appID, keypath)
 	}
 
-	// get the root dictionary
 	rootValue, err := internal.Get(appID, segments[0])
 	if err != nil {
 		// root doesn't exist, nothing to delete
@@ -31,7 +26,7 @@ func Delete(appID, key string) error {
 	rootDict, ok := rootValue.(map[string]any)
 	if !ok {
 		return fmt.Errorf("keypath error: %s [%s] - segment '%s' is not a dictionary (type: %T)",
-			key, appID, segments[0], rootValue)
+			keypath, appID, segments[0], rootValue)
 	}
 
 	// traverse to the parent of the final key
@@ -49,7 +44,7 @@ func Delete(appID, key string) error {
 		nextDict, ok := value.(map[string]any)
 		if !ok {
 			return fmt.Errorf("keypath error: %s [%s] - segment '%s' is not a dictionary (type: %T)",
-				key, appID, segment, value)
+				keypath, appID, segment, value)
 		}
 		currentDict = nextDict
 	}
@@ -62,13 +57,9 @@ func Delete(appID, key string) error {
 	return internal.Set(appID, segments[0], rootDict)
 }
 
-// Exists checks if a preference key exists for the given application ID.
-// The key may be a keypath separated by forward slashes ("/") to traverse
-// nested dictionaries. Returns true only if all elements in the keypath exist.
-// For example, "map-test/string" will return true only if both the "map-test"
-// dictionary exists and it contains a "string" key.
-func Exists(appID, key string) (bool, error) {
-	segments := strings.Split(key, "/")
+// Checks if a preference key exists for the given application ID.
+func Exists(appID, keypath string) (bool, error) {
+	segments := strings.Split(keypath, "/")
 
 	// check if the root key exists
 	exists, err := internal.Exists(appID, segments[0])
@@ -92,14 +83,12 @@ func Exists(appID, key string) (bool, error) {
 
 	// traverse the remaining path segments
 	for i := 1; i < len(segments); i++ {
-		// Current value must be a map to traverse further
 		dict, ok := value.(map[string]any)
 		if !ok {
 			// segment is not a dictionary, path doesn't exist
 			return false, nil
 		}
 
-		// Check if the next segment exists in the dictionary
 		value, ok = dict[segments[i]]
 		if !ok {
 			// segment not found

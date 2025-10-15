@@ -66,20 +66,6 @@ err = cfprefs.Set("com.example.app", "config", map[string]any{
 })
 ```
 
-### Supported Types
-
-| Go Type | CoreFoundation Type |
-|---------|-------------------|
-| `string` | CFString |
-| `bool` | CFBoolean |
-| `int`, `int8`, `int16`, `int32`, `int64` | CFNumber |
-| `uint`, `uint8`, `uint16`, `uint32`, `uint64` | CFNumber |
-| `float32`, `float64` | CFNumber |
-| `time.Time` | CFDate |
-| `[]byte` | CFData |
-| `[]any` | CFArray |
-| `map[string]any` | CFDictionary |
-
 ### Deleting Preferences
 
 ```go
@@ -91,6 +77,10 @@ err := cfprefs.Delete("com.example.app", "username")
 ```go
 exists, err := cfprefs.Exists("com.example.app", "username")
 ```
+
+## Using Keypaths
+
+TODO - document usage
 
 ## Command-Line Interface
 
