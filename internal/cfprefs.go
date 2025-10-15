@@ -31,7 +31,6 @@ func Get(appID, key string) (any, error) {
 	}
 	defer C.CFRelease(value)
 
-	// Convert the CFType to a native Go type
 	goValue, err := convertCFTypeToGo(value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert preference value: %w", err)
@@ -60,7 +59,6 @@ func Set(appID, key string, value any) error {
 
 	C.CFPreferencesSetAppValue(keyRef, valueRef, appIDRef)
 
-	// Synchronize to ensure the change is written
 	success := C.CFPreferencesAppSynchronize(appIDRef)
 	if success == 0 {
 		return fmt.Errorf("failed to synchronize preferences")
@@ -77,11 +75,9 @@ func Delete(appID, key string) error {
 	keyRef := C.createCFString(C.CString(key))
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
-	// Setting value to nil deletes the preference
 	nilRef := C.CFTypeRef(unsafe.Pointer(nil))
 	C.CFPreferencesSetAppValue(keyRef, nilRef, appIDRef)
 
-	// Synchronize to ensure the change is written
 	success := C.CFPreferencesAppSynchronize(appIDRef)
 	if success == 0 {
 		return fmt.Errorf("failed to synchronize preferences")

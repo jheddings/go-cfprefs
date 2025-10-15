@@ -2,20 +2,47 @@ package cfprefs
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
 // Get retrieves a preference value for the given key and application ID.
-// The value is returned as a native Go type based on the stored CoreFoundation type.
+// The key may be a keypath separated by forward slashes ("/") to traverse
+// nested dictionaries. For example, "map-test/string" will retrieve the
+// "string" key from the "map-test" dictionary.
 func Get(appID, key string) (any, error) {
-	return internal.Get(appID, key)
+	segments := strings.Split(key, "/")
+
+	// start with the root value
+	value, err := internal.Get(appID, segments[0])
+	if err != nil {
+		return nil, err
+	}
+
+	// traverse the remaining path segments
+	for i := 1; i < len(segments); i++ {
+		// Current value must be a map to traverse further
+		dict, ok := value.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' is not a dictionary",
+				key, appID, segments[i-1])
+		}
+
+		// Get the next value from the dictionary
+		value, ok = dict[segments[i]]
+		if !ok {
+			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' not found in dictionary",
+				key, appID, segments[i])
+		}
+	}
+
+	return value, nil
 }
 
 // GetStr retrieves a string preference value for the given key and application ID.
-// Returns an error if the value is not a string.
 func GetStr(appID, key string) (string, error) {
-	value, err := internal.Get(appID, key)
+	value, err := Get(appID, key)
 	if err != nil {
 		return "", err
 	}
@@ -29,9 +56,8 @@ func GetStr(appID, key string) (string, error) {
 }
 
 // GetInt retrieves an integer preference value for the given key and application ID.
-// Returns an error if the value is not an integer.
 func GetInt(appID, key string) (int64, error) {
-	value, err := internal.Get(appID, key)
+	value, err := Get(appID, key)
 	if err != nil {
 		return 0, err
 	}
@@ -45,9 +71,8 @@ func GetInt(appID, key string) (int64, error) {
 }
 
 // GetBool retrieves a boolean preference value for the given key and application ID.
-// Returns an error if the value is not a boolean.
 func GetBool(appID, key string) (bool, error) {
-	value, err := internal.Get(appID, key)
+	value, err := Get(appID, key)
 	if err != nil {
 		return false, err
 	}
@@ -61,9 +86,8 @@ func GetBool(appID, key string) (bool, error) {
 }
 
 // GetFloat retrieves a float preference value for the given key and application ID.
-// Returns an error if the value is not a float.
 func GetFloat(appID, key string) (float64, error) {
-	value, err := internal.Get(appID, key)
+	value, err := Get(appID, key)
 	if err != nil {
 		return 0.0, err
 	}
