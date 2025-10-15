@@ -2,17 +2,18 @@ package cfprefs
 
 import (
 	"fmt"
-	"strings"
+	"time"
 
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
-// Get retrieves a preference value for the given key and application ID.
-// The key may be a keypath separated by forward slashes ("/") to traverse
-// nested dictionaries. For example, "map-test/string" will retrieve the
-// "string" key from the "map-test" dictionary.
-func Get(appID, key string) (any, error) {
-	segments := strings.Split(key, "/")
+// Get retrieves a preference value for the given keypath and application ID.
+// Returns the value at the specified path or an error if not found.
+func Get(appID, keypath string) (any, error) {
+	segments, err := splitKeypath(keypath)
+	if err != nil {
+		return nil, err
+	}
 
 	// start with the root value
 	value, err := internal.Get(appID, segments[0])
@@ -22,80 +23,146 @@ func Get(appID, key string) (any, error) {
 
 	// traverse the remaining path segments
 	for i := 1; i < len(segments); i++ {
-		// Current value must be a map to traverse further
+		// current value must be a map to traverse further
 		dict, ok := value.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' is not a dictionary",
-				key, appID, segments[i-1])
+			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' is not a dictionary", keypath, appID, segments[i-1])
 		}
 
-		// Get the next value from the dictionary
+		// get the next value from the dictionary
 		value, ok = dict[segments[i]]
 		if !ok {
-			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' not found in dictionary",
-				key, appID, segments[i])
+			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' not found in dictionary", keypath, appID, segments[i])
 		}
 	}
 
 	return value, nil
 }
 
-// GetStr retrieves a string preference value for the given key and application ID.
-func GetStr(appID, key string) (string, error) {
-	value, err := Get(appID, key)
+// GetStr retrieves a string preference value for the given keypath and application ID.
+// Returns an error if the key doesn't exist or if the value is not a string.
+func GetStr(appID, keypath string) (string, error) {
+	value, err := Get(appID, keypath)
 	if err != nil {
 		return "", err
 	}
 
 	strValue, ok := value.(string)
 	if !ok {
-		return "", fmt.Errorf("preference value is not a string: %T", value)
+		return "", fmt.Errorf("type mismatch: %s [%s] - expected string, got %T", keypath, appID, value)
 	}
 
 	return strValue, nil
 }
 
-// GetInt retrieves an integer preference value for the given key and application ID.
-func GetInt(appID, key string) (int64, error) {
-	value, err := Get(appID, key)
-	if err != nil {
-		return 0, err
-	}
-
-	intValue, ok := value.(int64)
-	if !ok {
-		return 0, fmt.Errorf("preference value is not an integer: %T", value)
-	}
-
-	return intValue, nil
-}
-
 // GetBool retrieves a boolean preference value for the given key and application ID.
-func GetBool(appID, key string) (bool, error) {
-	value, err := Get(appID, key)
+// Returns an error if the key doesn't exist or if the value is not a boolean.
+func GetBool(appID, keypath string) (bool, error) {
+	value, err := Get(appID, keypath)
 	if err != nil {
 		return false, err
 	}
 
 	boolValue, ok := value.(bool)
 	if !ok {
-		return false, fmt.Errorf("preference value is not a boolean: %T", value)
+		return false, fmt.Errorf("type mismatch: %s [%s] - expected bool, got %T", keypath, appID, value)
 	}
 
 	return boolValue, nil
 }
 
+// GetInt retrieves an integer preference value for the given key and application ID.
+// Returns an error if the key doesn't exist or if the value is not an integer.
+func GetInt(appID, keypath string) (int64, error) {
+	value, err := Get(appID, keypath)
+	if err != nil {
+		return 0, err
+	}
+
+	intValue, ok := value.(int64)
+	if !ok {
+		return 0, fmt.Errorf("type mismatch: %s [%s] - expected int64, got %T", keypath, appID, value)
+	}
+
+	return intValue, nil
+}
+
 // GetFloat retrieves a float preference value for the given key and application ID.
-func GetFloat(appID, key string) (float64, error) {
-	value, err := Get(appID, key)
+// Returns an error if the key doesn't exist or if the value is not a float.
+func GetFloat(appID, keypath string) (float64, error) {
+	value, err := Get(appID, keypath)
 	if err != nil {
 		return 0.0, err
 	}
 
 	floatValue, ok := value.(float64)
 	if !ok {
-		return 0.0, fmt.Errorf("preference value is not a float: %T", value)
+		return 0.0, fmt.Errorf("type mismatch: %s [%s] - expected float64, got %T", keypath, appID, value)
 	}
 
 	return floatValue, nil
+}
+
+// GetDate retrieves a time.Time preference value for the given key and application ID.
+// Returns an error if the key doesn't exist or if the value is not a time.Time.
+func GetDate(appID, keypath string) (time.Time, error) {
+	value, err := Get(appID, keypath)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	dateValue, ok := value.(time.Time)
+	if !ok {
+		return time.Time{}, fmt.Errorf("type mismatch: %s [%s] - expected time.Time, got %T", keypath, appID, value)
+	}
+
+	return dateValue, nil
+}
+
+// GetSlice retrieves a []any preference value for the given key and application ID.
+// Returns an error if the key doesn't exist or if the value is not a []any.
+func GetSlice(appID, keypath string) ([]any, error) {
+	value, err := Get(appID, keypath)
+	if err != nil {
+		return nil, err
+	}
+
+	sliceValue, ok := value.([]any)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []any, got %T", keypath, appID, value)
+	}
+
+	return sliceValue, nil
+}
+
+// GetMap retrieves a map[string]any preference value for the given key and application ID.
+// Returns an error if the key doesn't exist or if the value is not a map[string]any.
+func GetMap(appID, keypath string) (map[string]any, error) {
+	value, err := Get(appID, keypath)
+	if err != nil {
+		return nil, err
+	}
+
+	mapValue, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected map[string]any, got %T", keypath, appID, value)
+	}
+
+	return mapValue, nil
+}
+
+// GetData retrieves a []byte preference value for the given key and application ID.
+// Returns an error if the key doesn't exist or if the value is not a []byte.
+func GetData(appID, keypath string) ([]byte, error) {
+	value, err := Get(appID, keypath)
+	if err != nil {
+		return nil, err
+	}
+
+	dataValue, ok := value.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []byte, got %T", keypath, appID, value)
+	}
+
+	return dataValue, nil
 }

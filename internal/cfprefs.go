@@ -7,6 +7,8 @@ import (
 	"unsafe"
 )
 
+// TODO: fail gracefully if not running on macOS
+
 /*
 #cgo LDFLAGS: -framework CoreFoundation
 #include <CoreFoundation/CoreFoundation.h>
