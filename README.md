@@ -4,7 +4,7 @@ Go module wrapper for the `CFPreferences` API's in macOS.
 
 ## Features
 
-- Read and write macOS preferences (plist files) using native Go types
+- Read and write macOS preferences using native Go types
 - Automatic type conversion between Go types and CoreFoundation types
 - Support for all common data types: strings, numbers, booleans, dates, arrays, dictionaries, and binary data
 
@@ -25,11 +25,6 @@ import "github.com/jheddings/go-cfprefs"
 value, err := cfprefs.Get("com.apple.finder", "ShowPathbar")
 if err != nil {
     log.Fatal(err)
-}
-
-// The value is returned as the appropriate Go type
-if showPathbar, ok := value.(bool); ok {
-    fmt.Printf("Show Pathbar: %v\n", showPathbar)
 }
 ```
 
@@ -84,7 +79,7 @@ TODO - document usage
 
 ## Command-Line Interface
 
-There is a basic CLI that acts as a demonstration of this module, as well as used for testing.
+There is a [basic CLI](cli/README.md) that acts as a demonstration of this module, as well as used for testing.
 
 ## License
 
