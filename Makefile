@@ -19,7 +19,7 @@ endif
 
 
 .PHONY: all
-all: build
+all: test build
 
 
 .PHONY: init
