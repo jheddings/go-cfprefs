@@ -2,14 +2,17 @@ package cfprefs
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
-// Removes a preference key for the given application ID
+// Delete removes a preference value for the given keypath and application ID.
+// Returns an error if any intermediate segment exists but is not a dictionary.
 func Delete(appID, keypath string) error {
-	segments := strings.Split(keypath, "/")
+	segments, err := splitKeypath(keypath)
+	if err != nil {
+		return err
+	}
 
 	// if there's only one segment, delete directly
 	if len(segments) == 1 {
@@ -57,9 +60,13 @@ func Delete(appID, keypath string) error {
 	return internal.Set(appID, segments[0], rootDict)
 }
 
-// Checks if a preference key exists for the given application ID.
+// Exists checks if a preference key exists for the given application ID.
+// Returns true if the full path exists, false otherwise.
 func Exists(appID, keypath string) (bool, error) {
-	segments := strings.Split(keypath, "/")
+	segments, err := splitKeypath(keypath)
+	if err != nil {
+		return false, err
+	}
 
 	// check if the root key exists
 	exists, err := internal.Exists(appID, segments[0])
