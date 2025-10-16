@@ -83,4 +83,4 @@ There is a [basic CLI](cli/README.md) that acts as a demonstration of this modul
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+This project is licensed under the terms of the MIT license. See [LICENSE](LICENSE) for details.
