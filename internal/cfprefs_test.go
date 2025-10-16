@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -27,7 +28,7 @@ func TestBasicStr(t *testing.T) {
 }
 
 func TestBasicInt(t *testing.T) {
-	number := 1234567890
+	number := rand.Int()
 	t.Log(number)
 
 	err := Set("com.jheddings.cfprefs.testing", "int", number)
@@ -68,7 +69,7 @@ func TestBasicBool(t *testing.T) {
 }
 
 func TestBasicFloat(t *testing.T) {
-	testValue := 3.14159265
+	testValue := rand.Float64()
 
 	err := Set("com.jheddings.cfprefs.testing", "float", testValue)
 
