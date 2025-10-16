@@ -52,6 +52,11 @@ test: unit-test
 	cd $(SRCDIR) && go tool cover -func=tmp/coverage.out
 
 
+.PHONY: test
+coverage: test
+	cd $(SRCDIR) && go tool cover -html=tmp/coverage.out -o tmp/coverage.html
+
+
 .PHONY: static-checks
 static-checks: unit-test
 
