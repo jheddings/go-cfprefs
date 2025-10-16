@@ -32,12 +32,40 @@ double getCFNumberAsFloat64(CFNumberRef numRef) {
     return value;
 }
 
+CFNumberType getCFNumberType(CFNumberRef numRef) {
+    return CFNumberGetType(numRef);
+}
+
 Boolean isCFNumberFloat(CFNumberRef numRef) {
     CFNumberType type = CFNumberGetType(numRef);
     return (type == kCFNumberFloatType ||
             type == kCFNumberDoubleType ||
             type == kCFNumberFloat32Type ||
             type == kCFNumberFloat64Type);
+}
+
+int8_t getCFNumberAsInt8(CFNumberRef numRef) {
+    int8_t value = 0;
+    CFNumberGetValue(numRef, kCFNumberSInt8Type, &value);
+    return value;
+}
+
+int16_t getCFNumberAsInt16(CFNumberRef numRef) {
+    int16_t value = 0;
+    CFNumberGetValue(numRef, kCFNumberSInt16Type, &value);
+    return value;
+}
+
+int32_t getCFNumberAsInt32(CFNumberRef numRef) {
+    int32_t value = 0;
+    CFNumberGetValue(numRef, kCFNumberSInt32Type, &value);
+    return value;
+}
+
+float getCFNumberAsFloat32(CFNumberRef numRef) {
+    float value = 0;
+    CFNumberGetValue(numRef, kCFNumberFloat32Type, &value);
+    return value;
 }
 
 CFIndex getCFArrayCount(CFArrayRef arr) {
@@ -138,12 +166,36 @@ func convertCFStringToGo(strRef C.CFStringRef) (string, error) {
 	return C.GoString(cStr), nil
 }
 
-// converts a CFNumberRef to either int64 or float64
+// converts a CFNumberRef to the appropriate Go numeric type
 func convertCFNumberToGo(numRef C.CFNumberRef) (any, error) {
-	if C.isCFNumberFloat(numRef) != 0 {
+	numberType := C.getCFNumberType(numRef)
+
+	switch numberType {
+	case C.kCFNumberSInt8Type, C.kCFNumberCharType:
+		return int8(C.getCFNumberAsInt8(numRef)), nil
+
+	case C.kCFNumberSInt16Type, C.kCFNumberShortType:
+		return int16(C.getCFNumberAsInt16(numRef)), nil
+
+	case C.kCFNumberSInt32Type, C.kCFNumberIntType:
+		return int32(C.getCFNumberAsInt32(numRef)), nil
+
+	case C.kCFNumberSInt64Type, C.kCFNumberLongLongType:
+		return int64(C.getCFNumberAsInt64(numRef)), nil
+
+	case C.kCFNumberFloat32Type, C.kCFNumberFloatType:
+		return float32(C.getCFNumberAsFloat32(numRef)), nil
+
+	case C.kCFNumberFloat64Type, C.kCFNumberDoubleType, C.kCFNumberCGFloatType:
 		return float64(C.getCFNumberAsFloat64(numRef)), nil
+
+	default:
+		// Fallback: try float first, then int
+		if C.isCFNumberFloat(numRef) != 0 {
+			return float64(C.getCFNumberAsFloat64(numRef)), nil
+		}
+		return int64(C.getCFNumberAsInt64(numRef)), nil
 	}
-	return int64(C.getCFNumberAsInt64(numRef)), nil
 }
 
 // converts a CFBooleanRef to a Go bool

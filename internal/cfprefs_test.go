@@ -26,6 +26,41 @@ func valuesEqualApprox(expected, actual any) bool {
 		}
 	}
 
+	// handle uint -> int64 conversion (CoreFoundation doesn't have unsigned types)
+	if expUint, ok := expected.(uint); ok {
+		if actInt, ok := actual.(int64); ok {
+			return int64(expUint) == actInt
+		}
+	}
+
+	// handle uint8 -> int16 conversion (to safely represent full uint8 range)
+	if expUint8, ok := expected.(uint8); ok {
+		if actInt16, ok := actual.(int16); ok {
+			return int16(expUint8) == actInt16
+		}
+	}
+
+	// handle uint16 -> int32 conversion (to safely represent full uint16 range)
+	if expUint16, ok := expected.(uint16); ok {
+		if actInt32, ok := actual.(int32); ok {
+			return int32(expUint16) == actInt32
+		}
+	}
+
+	// handle uint32 -> int64 conversion (to safely represent full uint32 range)
+	if expUint32, ok := expected.(uint32); ok {
+		if actInt64, ok := actual.(int64); ok {
+			return int64(expUint32) == actInt64
+		}
+	}
+
+	// handle uint64 -> int64 conversion (may overflow for very large values)
+	if expUint64, ok := expected.(uint64); ok {
+		if actInt64, ok := actual.(int64); ok {
+			return int64(expUint64) == actInt64
+		}
+	}
+
 	// handle float comparison with epsilon tolerance
 	if expFloat, ok := expected.(float64); ok {
 		if actFloat, ok := actual.(float64); ok {
@@ -77,13 +112,25 @@ func TestGetSetTypes(t *testing.T) {
 	}{
 		{name: "string", val: time.Now().Format(time.RFC3339)},
 		{name: "int", val: rand.Int()},
-		{name: "float", val: rand.Float64()},
-		{name: "time", val: time.Now()},
+		{name: "int8", val: int8(rand.Intn(math.MaxInt8))},
+		{name: "int16", val: int16(rand.Intn(math.MaxInt16))},
+		{name: "int32", val: rand.Int31()},
+		{name: "int64", val: rand.Int63()},
+		{name: "uint", val: uint(rand.Uint32())},
+		{name: "uint8", val: uint8(rand.Uint32())},
+		{name: "uint16", val: uint16(rand.Uint32())},
+		{name: "uint32", val: rand.Uint32()},
+		{name: "uint64", val: rand.Uint64()},
+		{name: "float32", val: rand.Float32()},
+		{name: "float64", val: rand.Float64()},
+		{name: "bool-true", val: true},
+		{name: "bool-false", val: false},
+		{name: "date-time", val: time.Now()},
 		{name: "bytes", val: []byte("hello world")},
 		{name: "array", val: []any{
 			rand.Int(),
 			rand.Float64(),
-			true,
+			false,
 			time.Now(),
 		}},
 		{name: "map", val: map[string]any{
@@ -94,6 +141,9 @@ func TestGetSetTypes(t *testing.T) {
 			"time":   time.Now(),
 			"bytes":  []byte("hello world"),
 		}},
+		{name: "empty-bytes", val: []byte{}},
+		{name: "empty-slice", val: []any{}},
+		{name: "empty-map", val: map[string]any{}},
 	}
 
 	for _, tc := range testCases {
@@ -151,5 +201,21 @@ func TestMissingExists(t *testing.T) {
 	}
 	if exists {
 		t.Fatal("expected false for missing key, got true")
+	}
+}
+
+func TestEmptySlice(t *testing.T) {
+	err := Set("com.jheddings.cfprefs.testing", "empty-slice", []any{})
+	if err != nil {
+		t.Fatalf("expected no error for empty slice, got '%v'", err)
+	}
+
+	readVal, err := Get("com.jheddings.cfprefs.testing", "empty-slice")
+	if err != nil {
+		t.Fatalf("expected no error for empty slice, got '%v'", err)
+	}
+
+	if !reflect.DeepEqual(readVal, []any{}) {
+		t.Fatalf("expected empty slice, got '%v'", readVal)
 	}
 }
