@@ -21,14 +21,20 @@ import "C"
 
 // Get retrieves a preference value for the given key and appID.
 func Get(appID, key string) (any, error) {
-	appIDRef := C.createCFString(C.CString(appID))
+	appIDRef, err := createCFStringRef(appID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CFString for appID: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
-	keyRef := C.createCFString(C.CString(key))
+	keyRef, err := createCFStringRef(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CFString for key: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
-	if unsafe.Pointer(value) == nil {
+	if value == C.CFTypeRef(unsafe.Pointer(nil)) {
 		return nil, fmt.Errorf("key not found: %s [%s]", key, appID)
 	}
 	defer C.CFRelease(value)
@@ -43,10 +49,16 @@ func Get(appID, key string) (any, error) {
 
 // Set updates a preference value for the given key and appID.
 func Set(appID, key string, value any) error {
-	appIDRef := C.createCFString(C.CString(appID))
+	appIDRef, err := createCFStringRef(appID)
+	if err != nil {
+		return fmt.Errorf("failed to create CFString for appID: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
-	keyRef := C.createCFString(C.CString(key))
+	keyRef, err := createCFStringRef(key)
+	if err != nil {
+		return fmt.Errorf("failed to create CFString for key: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
 	valueRef, err := convertGoToCFType(value)
@@ -54,7 +66,7 @@ func Set(appID, key string, value any) error {
 		return fmt.Errorf("failed to convert value: %w", err)
 	}
 	defer func() {
-		if unsafe.Pointer(valueRef) != nil {
+		if valueRef != C.CFTypeRef(unsafe.Pointer(nil)) {
 			C.CFRelease(valueRef)
 		}
 	}()
@@ -71,10 +83,16 @@ func Set(appID, key string, value any) error {
 
 // Delete removes a preference value for the given key and appID.
 func Delete(appID, key string) error {
-	appIDRef := C.createCFString(C.CString(appID))
+	appIDRef, err := createCFStringRef(appID)
+	if err != nil {
+		return fmt.Errorf("failed to create CFString for appID: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
-	keyRef := C.createCFString(C.CString(key))
+	keyRef, err := createCFStringRef(key)
+	if err != nil {
+		return fmt.Errorf("failed to create CFString for key: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
 	nilRef := C.CFTypeRef(unsafe.Pointer(nil))
@@ -90,14 +108,20 @@ func Delete(appID, key string) error {
 
 // Exists checks if a key exists for the given appID.
 func Exists(appID, key string) (bool, error) {
-	appIDRef := C.createCFString(C.CString(appID))
+	appIDRef, err := createCFStringRef(appID)
+	if err != nil {
+		return false, fmt.Errorf("failed to create CFString for appID: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
-	keyRef := C.createCFString(C.CString(key))
+	keyRef, err := createCFStringRef(key)
+	if err != nil {
+		return false, fmt.Errorf("failed to create CFString for key: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
-	if unsafe.Pointer(value) == nil {
+	if value == C.CFTypeRef(unsafe.Pointer(nil)) {
 		return false, nil
 	}
 	defer C.CFRelease(value)

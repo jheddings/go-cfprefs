@@ -228,14 +228,8 @@ func convertCFDataToGo(dataRef C.CFDataRef) any {
 
 // converts a CFDateRef to a Go time.Time
 func convertCFDateToGo(dateRef C.CFDateRef) time.Time {
-	// CFAbsoluteTime is seconds since Jan 1, 2001 00:00:00 GMT
-	// Unix epoch is Jan 1, 1970 00:00:00 GMT
-	// Difference is 31 years = 978307200 seconds
-	// FIXME: perform the calculation instead of using a constant
-	const cfAbsoluteTimeIntervalSince1970 = 978307200.0
-
 	absoluteTime := float64(C.getCFDateAbsoluteTime(dateRef))
-	unixTime := absoluteTime + cfAbsoluteTimeIntervalSince1970
+	unixTime := absoluteTime + CFAbsoluteTimeIntervalSince1970
 
 	seconds := int64(unixTime)
 	nanoseconds := int64((unixTime - float64(seconds)) * 1e9)
