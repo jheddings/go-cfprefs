@@ -41,6 +41,24 @@ func Get(appID, key string) (any, error) {
 	return goValue, nil
 }
 
+// GetKeys retrieves all keys for the given appID.
+func GetKeys(appID string) (any, error) {
+	appIDRef := C.createCFString(C.CString(appID))
+	defer C.CFRelease(C.CFTypeRef(appIDRef))
+
+	value := C.CFPreferencesCopyKeyList(appIDRef, C.kCFPreferencesCurrentUser, C.kCFPreferencesCurrentHost)
+	if unsafe.Pointer(value) == nil {
+		return nil, fmt.Errorf("app not found: %s", appID)
+	}
+
+	keys, err := convertCFArrayToGo(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert keys array: %w", err)
+	}
+
+	return keys, nil
+}
+
 // Set updates a preference value for the given key and appID.
 func Set(appID, key string, value any) error {
 	appIDRef := C.createCFString(C.CString(appID))
