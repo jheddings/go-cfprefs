@@ -156,6 +156,11 @@ func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
 	}
 }
 
+// converts a CFBooleanRef to a Go bool
+func convertCFBooleanToGo(boolRef C.CFBooleanRef) bool {
+	return C.getCFBoolean(boolRef) != 0
+}
+
 // converts a CFStringRef to a Go string
 func convertCFStringToGo(strRef C.CFStringRef) (string, error) {
 	cStr := C.cfStringToC(strRef)
@@ -197,9 +202,49 @@ func convertCFNumberToGo(numRef C.CFNumberRef) (any, error) {
 	}
 }
 
-// converts a CFBooleanRef to a Go bool
-func convertCFBooleanToGo(boolRef C.CFBooleanRef) bool {
-	return C.getCFBoolean(boolRef) != 0
+// converts a CFDateRef to a Go time.Time
+func convertCFDateToGo(dateRef C.CFDateRef) time.Time {
+	// CFAbsoluteTime is seconds since Jan 1, 2001 00:00:00 GMT
+	// Unix epoch is Jan 1, 1970 00:00:00 GMT
+	// Difference is 31 years = 978307200 seconds
+	// FIXME: perform the calculation instead of using a constant
+	const cfAbsoluteTimeIntervalSince1970 = 978307200.0
+
+	absoluteTime := float64(C.getCFDateAbsoluteTime(dateRef))
+	unixTime := absoluteTime + cfAbsoluteTimeIntervalSince1970
+
+	seconds := int64(unixTime)
+	nanoseconds := int64((unixTime - float64(seconds)) * 1e9)
+
+	return time.Unix(seconds, nanoseconds)
+}
+
+// converts a complex CFDataRef to a Go value
+func convertCFDataToGo(dataRef C.CFDataRef) any {
+	length := int(C.getCFDataLength(dataRef))
+	if length == 0 {
+		return []byte{}
+	}
+
+	bytes := C.getCFDataBytes(dataRef)
+	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
+
+	// first, try to deserialize as property list
+	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
+		defer C.CFRelease(C.CFTypeRef(plist))
+		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
+			return value
+		}
+	}
+
+	// next, try to deserialize as JSON
+	var jsonValue any
+	if err := json.Unmarshal(data, &jsonValue); err == nil {
+		return jsonValue
+	}
+
+	// neither worked... return as raw bytes
+	return data
 }
 
 // converts a CFArrayRef to a Go slice
@@ -247,49 +292,4 @@ func convertCFDictionaryToGo(dictRef C.CFDictionaryRef) (map[string]any, error) 
 	}
 
 	return result, nil
-}
-
-// converts a complex CFDataRef to a Go value
-func convertCFDataToGo(dataRef C.CFDataRef) any {
-	length := int(C.getCFDataLength(dataRef))
-	if length == 0 {
-		return []byte{}
-	}
-
-	bytes := C.getCFDataBytes(dataRef)
-	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
-
-	// first, try to deserialize as property list
-	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
-		defer C.CFRelease(C.CFTypeRef(plist))
-		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
-			return value
-		}
-	}
-
-	// next, try to deserialize as JSON
-	var jsonValue any
-	if err := json.Unmarshal(data, &jsonValue); err == nil {
-		return jsonValue
-	}
-
-	// neither worked... return as raw bytes
-	return data
-}
-
-// converts a CFDateRef to a Go time.Time
-func convertCFDateToGo(dateRef C.CFDateRef) time.Time {
-	// CFAbsoluteTime is seconds since Jan 1, 2001 00:00:00 GMT
-	// Unix epoch is Jan 1, 1970 00:00:00 GMT
-	// Difference is 31 years = 978307200 seconds
-	// FIXME: perform the calculation instead of using a constant
-	const cfAbsoluteTimeIntervalSince1970 = 978307200.0
-
-	absoluteTime := float64(C.getCFDateAbsoluteTime(dateRef))
-	unixTime := absoluteTime + cfAbsoluteTimeIntervalSince1970
-
-	seconds := int64(unixTime)
-	nanoseconds := int64((unixTime - float64(seconds)) * 1e9)
-
-	return time.Unix(seconds, nanoseconds)
 }
