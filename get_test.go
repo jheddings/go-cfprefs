@@ -13,9 +13,11 @@ import (
 func setupTest(t *testing.T, appID, key string, value any) func() {
 	t.Helper()
 	err := Set(appID, key, value)
+
 	if err != nil {
 		t.Fatalf("failed to set test value: %v", err)
 	}
+
 	return func() {
 		if err := Delete(appID, key); err != nil {
 			t.Errorf("failed to cleanup test key: %v", err)

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// valuesEqualApprox compares two values with tolerance for type conversions and floating point precision
+// ValuesEqualApprox compares two values with tolerance for type conversions and floating point precision
 func ValuesEqualApprox(expected, actual any) bool {
 	// handle time.Time specially
 	if expTime, ok := expected.(time.Time); ok {
