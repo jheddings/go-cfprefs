@@ -190,7 +190,6 @@ func convertCFNumberToGo(numRef C.CFNumberRef) (any, error) {
 		return float64(C.getCFNumberAsFloat64(numRef)), nil
 
 	default:
-		// Fallback: try float first, then int
 		if C.isCFNumberFloat(numRef) != 0 {
 			return float64(C.getCFNumberAsFloat64(numRef)), nil
 		}
