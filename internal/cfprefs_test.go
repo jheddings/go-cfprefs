@@ -208,3 +208,39 @@ func TestBasicMap(t *testing.T) {
 		}
 	}
 }
+
+func TestGetKeys(t *testing.T) {
+	err := Set("com.jheddings.cfprefs.testing", "key1", "one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer Delete("com.jheddings.cfprefs.testing", "key1")
+
+	err = Set("com.jheddings.cfprefs.testing", "key2", "two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer Delete("com.jheddings.cfprefs.testing", "key2")
+
+	keys, err := GetKeys("com.jheddings.cfprefs.testing")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	retrievedKeys, ok := keys.([]string)
+	if !ok {
+		t.Fatalf("keys is not []string: got %T", keys)
+	}
+
+	if len(retrievedKeys) != 2 {
+		t.Fatalf("keys length does not match: expected %d, got %d", 2, len(retrievedKeys))
+	}
+
+	if retrievedKeys[0] != "key1" {
+		t.Fatalf("key1 is not in keys: got %s", retrievedKeys[0])
+	}
+
+	if retrievedKeys[1] != "key2" {
+		t.Fatalf("key2 is not in keys: got %s", retrievedKeys[1])
+	}
+}
