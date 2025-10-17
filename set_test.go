@@ -2,6 +2,8 @@ package cfprefs
 
 import (
 	"testing"
+
+	"github.com/jheddings/go-cfprefs/testutil"
 )
 
 // Note: Test helpers are defined in get_test.go since they're shared
@@ -14,16 +16,16 @@ func TestSetKeypath(t *testing.T) {
 
 	// Test setting a value in a nested path that doesn't exist yet
 	err := Set(appID, "nested-test/level1/level1.1/value", "hello from nested path")
-	assertNoError(t, err, "set nested path")
+	testutil.AssertNoError(t, err, "set nested path")
 	defer Delete(appID, "nested-test")
 
 	// Add a sibling branch
 	err = Set(appID, "nested-test/neighbor/level1.1/value", "hello from neighbor")
-	assertNoError(t, err, "set sibling branch")
+	testutil.AssertNoError(t, err, "set sibling branch")
 
 	// Verify the value was set correctly
 	value, err := Get(appID, "nested-test/level1/level1.1/value")
-	assertNoError(t, err, "get nested value")
+	testutil.AssertNoError(t, err, "get nested value")
 
 	strValue, ok := value.(string)
 	if !ok {
@@ -35,7 +37,7 @@ func TestSetKeypath(t *testing.T) {
 
 	// Verify the intermediate dictionaries were created
 	rootValue, err := Get(appID, "nested-test")
-	assertNoError(t, err, "get root dictionary")
+	testutil.AssertNoError(t, err, "get root dictionary")
 
 	rootDict, ok := rootValue.(map[string]any)
 	if !ok {
@@ -80,17 +82,17 @@ func TestSetKeypath(t *testing.T) {
 
 	// Test adding another value to the same nested structure
 	err = Set(appID, "nested-test/level1/level1.1/another", int64(42))
-	assertNoError(t, err, "set another value in existing path")
+	testutil.AssertNoError(t, err, "set another value in existing path")
 
 	// Verify both values exist
 	value1, err := Get(appID, "nested-test/level1/level1.1/value")
-	assertNoError(t, err, "get first value")
+	testutil.AssertNoError(t, err, "get first value")
 	if value1.(string) != "hello from nested path" {
 		t.Fatal("first value was modified when setting second value")
 	}
 
 	value2, err := Get(appID, "nested-test/level1/level1.1/another")
-	assertNoError(t, err, "get second value")
+	testutil.AssertNoError(t, err, "get second value")
 	if value2.(int64) != 42 {
 		t.Fatalf("second value does not match: expected 42, got %d", value2.(int64))
 	}
@@ -103,7 +105,7 @@ func TestSetEmptyKeypath(t *testing.T) {
 
 	// Test setting with empty keypath
 	err := Set(appID, "", "value")
-	assertError(t, err, "empty keypath")
+	testutil.AssertError(t, err, "empty keypath")
 }
 
 func TestSetKeypathOnlySlashes(t *testing.T) {
@@ -111,7 +113,7 @@ func TestSetKeypathOnlySlashes(t *testing.T) {
 
 	// Test keypath with only slashes
 	err := Set(appID, "///", "value")
-	assertError(t, err, "keypath with only slashes")
+	testutil.AssertError(t, err, "keypath with only slashes")
 }
 
 func TestSetKeypathNonDictSegment(t *testing.T) {
@@ -123,5 +125,5 @@ func TestSetKeypathNonDictSegment(t *testing.T) {
 
 	// Try to set a nested value through a non-dict segment
 	err := Set(appID, "simple-string/nested/value", "should fail")
-	assertError(t, err, "setting through non-dict segment")
+	testutil.AssertError(t, err, "setting through non-dict segment")
 }

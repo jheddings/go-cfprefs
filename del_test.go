@@ -1,6 +1,24 @@
 package cfprefs
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/jheddings/go-cfprefs/testutil"
+)
+
+// assertKeyExists verifies that a key exists
+func assertKeyExists(t *testing.T, appID, key string, expected bool) {
+	t.Helper()
+
+	exists, err := Exists(appID, key)
+	if err != nil {
+		t.Fatalf("failed to check if key exists: %v", err)
+	}
+
+	if exists != expected {
+		t.Fatalf("expected key existence to be %t, got %t", expected, exists)
+	}
+}
 
 func TestDeleteBasic(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
@@ -8,14 +26,14 @@ func TestDeleteBasic(t *testing.T) {
 
 	// Set a value
 	err := Set(appID, key, "test")
-	assertNoError(t, err, "set key")
+	testutil.AssertNoError(t, err, "set key")
 
 	// Verify it exists
 	assertKeyExists(t, appID, key, true)
 
 	// Delete the key
 	err = Delete(appID, key)
-	assertNoError(t, err, "delete key")
+	testutil.AssertNoError(t, err, "delete key")
 
 	// Verify it no longer exists
 	assertKeyExists(t, appID, key, false)
@@ -26,13 +44,13 @@ func TestDeleteKeypath(t *testing.T) {
 
 	// Create a nested structure with multiple keys
 	err := Set(appID, "delete-test/level1/value1", "first value")
-	assertNoError(t, err, "set first value")
+	testutil.AssertNoError(t, err, "set first value")
 
 	err = Set(appID, "delete-test/level1/value2", "second value")
-	assertNoError(t, err, "set second value")
+	testutil.AssertNoError(t, err, "set second value")
 
 	err = Set(appID, "delete-test/level2/nested", int64(42))
-	assertNoError(t, err, "set nested value")
+	testutil.AssertNoError(t, err, "set nested value")
 	defer Delete(appID, "delete-test")
 
 	// Verify all values exist
@@ -41,7 +59,7 @@ func TestDeleteKeypath(t *testing.T) {
 
 	// Delete one nested value
 	err = Delete(appID, "delete-test/level1/value1")
-	assertNoError(t, err, "delete nested key")
+	testutil.AssertNoError(t, err, "delete nested key")
 
 	// Verify it was deleted
 	assertKeyExists(t, appID, "delete-test/level1/value1", false)
@@ -50,7 +68,7 @@ func TestDeleteKeypath(t *testing.T) {
 	assertKeyExists(t, appID, "delete-test/level1/value2", true)
 
 	value, err := Get(appID, "delete-test/level1/value2")
-	assertNoError(t, err, "get sibling value")
+	testutil.AssertNoError(t, err, "get sibling value")
 	if value.(string) != "second value" {
 		t.Fatalf("sibling value was modified: expected 'second value', got '%s'", value.(string))
 	}
@@ -67,7 +85,7 @@ func TestExistsKeypath(t *testing.T) {
 
 	// Set up a nested structure
 	err := Set(appID, "exists-test/level1/level2/value", "nested value")
-	assertNoError(t, err, "set nested value")
+	testutil.AssertNoError(t, err, "set nested value")
 	defer Delete(appID, "exists-test")
 
 	// Test that full path exists
@@ -87,7 +105,7 @@ func TestDeleteEmptyKeypath(t *testing.T) {
 
 	// Test deleting with empty keypath
 	err := Delete(appID, "")
-	assertError(t, err, "empty keypath")
+	testutil.AssertError(t, err, "empty keypath")
 }
 
 func TestDeleteKeypathOnlySlashes(t *testing.T) {
@@ -95,7 +113,7 @@ func TestDeleteKeypathOnlySlashes(t *testing.T) {
 
 	// Test keypath with only slashes
 	err := Delete(appID, "///")
-	assertError(t, err, "keypath with only slashes")
+	testutil.AssertError(t, err, "keypath with only slashes")
 }
 
 func TestDeleteKeypathNonDictSegment(t *testing.T) {
@@ -107,7 +125,7 @@ func TestDeleteKeypathNonDictSegment(t *testing.T) {
 
 	// Try to delete through a non-dict segment - should return error
 	err := Delete(appID, "simple-string/nested")
-	assertError(t, err, "deleting through non-dict segment")
+	testutil.AssertError(t, err, "deleting through non-dict segment")
 }
 
 func TestDeleteMissingKey(t *testing.T) {
@@ -115,7 +133,7 @@ func TestDeleteMissingKey(t *testing.T) {
 
 	// Deleting a non-existent key should not error (idempotent)
 	err := Delete(appID, "this-key-does-not-exist")
-	assertNoError(t, err, "delete missing key should be idempotent")
+	testutil.AssertNoError(t, err, "delete missing key should be idempotent")
 }
 
 func TestExistsEmptyKeypath(t *testing.T) {
@@ -123,7 +141,7 @@ func TestExistsEmptyKeypath(t *testing.T) {
 
 	// Test empty keypath
 	_, err := Exists(appID, "")
-	assertError(t, err, "empty keypath")
+	testutil.AssertError(t, err, "empty keypath")
 }
 
 func TestExistsKeypathOnlySlashes(t *testing.T) {
@@ -131,5 +149,5 @@ func TestExistsKeypathOnlySlashes(t *testing.T) {
 
 	// Test keypath with only slashes
 	_, err := Exists(appID, "///")
-	assertError(t, err, "keypath with only slashes")
+	testutil.AssertError(t, err, "keypath with only slashes")
 }
