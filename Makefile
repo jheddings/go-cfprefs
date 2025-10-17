@@ -44,17 +44,17 @@ build-cli: init
 
 .PHONY: unit-test
 unit-test: init
-	cd $(SRCDIR) && go test -v -coverprofile=tmp/coverage.out ./...
+	cd $(SRCDIR) && go test -v ./...
 
 
 .PHONY: test
 test: unit-test
-	cd $(SRCDIR) && go tool cover -func=tmp/coverage.out
 
 
 .PHONY: test
 coverage: test
-	cd $(SRCDIR) && go tool cover -html=tmp/coverage.out -o tmp/coverage.html
+	cd $(SRCDIR) && go test -v -coverprofile=tmp/coverage.out ./...
+	cd $(SRCDIR) && go tool cover -html=tmp/coverage.out -o $(DISTDIR)/coverage.html
 
 
 .PHONY: static-checks
