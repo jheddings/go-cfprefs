@@ -168,6 +168,23 @@ func convertCFArrayToGo(arrRef C.CFArrayRef) ([]any, error) {
 	return result, nil
 }
 
+// converts a CFArrayRef to a Go slice of strings
+func convertCFArrayToGoStr(arrRef C.CFArrayRef) ([]string, error) {
+	count := int(C.getCFArrayCount(arrRef))
+	result := make([]string, count)
+
+	for i := range count {
+		cfValue := C.getCFArrayValueAtIndex(arrRef, C.CFIndex(i))
+		value, err := convertCFStringToGo(C.CFStringRef(cfValue))
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+		}
+		result[i] = value
+	}
+
+	return result, nil
+}
+
 // converts a CFDictionaryRef to a Go map
 func convertCFDictionaryToGo(dictRef C.CFDictionaryRef) (map[string]any, error) {
 	count := int(C.getCFDictionaryCount(dictRef))

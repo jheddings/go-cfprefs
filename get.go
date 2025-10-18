@@ -39,6 +39,12 @@ func Get(appID, keypath string) (any, error) {
 	return value, nil
 }
 
+// GetKeys retrieves all keys for the given appID.
+// Returns an error if the appID is not found.
+func GetKeys(appID string) ([]string, error) {
+	return internal.GetKeys(appID)
+}
+
 // GetStr retrieves a string preference value for the given keypath and application ID.
 // Returns an error if the key doesn't exist or if the value is not a string.
 func GetStr(appID, keypath string) (string, error) {
