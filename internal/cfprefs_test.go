@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -205,6 +206,29 @@ func TestBasicMap(t *testing.T) {
 	for k, v := range testValue {
 		if retrievedMap[k] != v {
 			t.Fatalf("map value for key %s does not match: expected %v, got %v", k, v, retrievedMap[k])
+		}
+	}
+}
+
+func TestGetKeys(t *testing.T) {
+	keys := []string{"key1", "key2"}
+
+	for _, key := range keys {
+		err := Set("com.jheddings.cfprefs.testing", key, key+"-value")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer Delete("com.jheddings.cfprefs.testing", key)
+	}
+
+	prefKeys, err := GetKeys("com.jheddings.cfprefs.testing")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range keys {
+		if !slices.Contains(prefKeys, key) {
+			t.Fatalf("key %s not found in keys", key)
 		}
 	}
 }

@@ -168,6 +168,23 @@ func convertCFArrayToGo(arrRef C.CFArrayRef) ([]any, error) {
 	return result, nil
 }
 
+// converts a CFArrayRef to a Go slice of strings
+func convertCFArrayToGoStr(arrRef C.CFArrayRef) ([]string, error) {
+	count := int(C.getCFArrayCount(arrRef))
+	result := make([]string, count)
+
+	for i := range count {
+		cfValue := C.getCFArrayValueAtIndex(arrRef, C.CFIndex(i))
+		value, err := convertCFStringToGo(C.CFStringRef(cfValue))
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+		}
+		result[i] = value
+	}
+
+	return result, nil
+}
+
 // converts a CFDictionaryRef to a Go map
 func convertCFDictionaryToGo(dictRef C.CFDictionaryRef) (map[string]any, error) {
 	count := int(C.getCFDictionaryCount(dictRef))
@@ -228,14 +245,8 @@ func convertCFDataToGo(dataRef C.CFDataRef) any {
 
 // converts a CFDateRef to a Go time.Time
 func convertCFDateToGo(dateRef C.CFDateRef) time.Time {
-	// CFAbsoluteTime is seconds since Jan 1, 2001 00:00:00 GMT
-	// Unix epoch is Jan 1, 1970 00:00:00 GMT
-	// Difference is 31 years = 978307200 seconds
-	// FIXME: perform the calculation instead of using a constant
-	const cfAbsoluteTimeIntervalSince1970 = 978307200.0
-
 	absoluteTime := float64(C.getCFDateAbsoluteTime(dateRef))
-	unixTime := absoluteTime + cfAbsoluteTimeIntervalSince1970
+	unixTime := absoluteTime + CFAbsoluteTimeIntervalSince1970
 
 	seconds := int64(unixTime)
 	nanoseconds := int64((unixTime - float64(seconds)) * 1e9)
