@@ -33,6 +33,7 @@ func Get(appID, key string) (any, error) {
 	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
+	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopyappvalue(_:_:)
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
 	if value == C.CFTypeRef(unsafe.Pointer(nil)) {
 		return nil, fmt.Errorf("key not found: %s [%s]", key, appID)
@@ -45,6 +46,26 @@ func Get(appID, key string) (any, error) {
 	}
 
 	return goValue, nil
+}
+
+// GetKeys retrieves all keys for the given appID.
+func GetKeys(appID string) ([]string, error) {
+	appIDRef := C.createCFString(C.CString(appID))
+	defer C.CFRelease(C.CFTypeRef(appIDRef))
+
+	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopykeylist(_:_:_:)
+	keysCF := C.CFPreferencesCopyKeyList(appIDRef, C.kCFPreferencesCurrentUser, C.kCFPreferencesAnyHost)
+	if unsafe.Pointer(keysCF) == nil {
+		return nil, fmt.Errorf("app not found: %s", appID)
+	}
+	defer C.CFRelease(C.CFTypeRef(keysCF))
+
+	keys, err := convertCFArrayToGoStr(keysCF)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert keys array: %w", err)
+	}
+
+	return keys, nil
 }
 
 // Set updates a preference value for the given key and appID.
@@ -71,8 +92,10 @@ func Set(appID, key string, value any) error {
 		}
 	}()
 
+	// https://developer.apple.com/documentation/corefoundation/cfpreferencessetappvalue(_:_:_:)
 	C.CFPreferencesSetAppValue(keyRef, valueRef, appIDRef)
 
+	// https://developer.apple.com/documentation/corefoundation/cfpreferencesappsynchronize(_:)
 	success := C.CFPreferencesAppSynchronize(appIDRef)
 	if success == 0 {
 		return fmt.Errorf("failed to synchronize preferences")

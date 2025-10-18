@@ -17,7 +17,7 @@ var readCmd = &cobra.Command{
 The key may be a keypath separated by forward slashes ("/") to traverse nested
 dictionaries. For example, "settings/display/brightness" will retrieve the
 "brightness" value from the nested structure.`,
-	Args: cobra.ExactArgs(2),
+	Args: cobra.MinimumNArgs(1),
 	Run:  doReadCmd,
 }
 
@@ -26,6 +26,35 @@ func init() {
 }
 
 func doReadCmd(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		log.Fatal().Msg("App ID is required")
+	}
+
+	if len(args) == 1 {
+		doReadKeysCmd(args)
+	} else {
+		doReadValueCmd(args)
+	}
+}
+
+func doReadKeysCmd(args []string) {
+	appID := args[0]
+	log.Trace().Str("app", appID).Msg("Reading keys")
+
+	keys, err := cfprefs.GetKeys(appID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to read keys")
+	}
+
+	jsonBytes, err := json.MarshalIndent(keys, "", "  ")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to marshal keys to JSON")
+	}
+
+	fmt.Println(string(jsonBytes))
+}
+
+func doReadValueCmd(args []string) {
 	appID, key := args[0], args[1]
 	log.Trace().Str("app", appID).Str("key", key).Msg("Reading preference")
 
