@@ -1,186 +1,153 @@
 package cfprefs
 
-import "testing"
+import (
+	"testing"
 
-func TestDeleteBasic(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	key := "del-test"
+	"github.com/jheddings/go-cfprefs/testutil"
+)
 
-	err := Set(appID, key, "test")
-	if err != nil {
-		t.Fatalf("failed to set key: %v", err)
-	}
+// assertKeyExists verifies that a key exists
+func assertKeyExists(t *testing.T, appID, key string, expected bool) {
+	t.Helper()
 
 	exists, err := Exists(appID, key)
 	if err != nil {
 		t.Fatalf("failed to check if key exists: %v", err)
 	}
-	if !exists {
-		t.Fatalf("key does not exist")
-	}
 
+	if exists != expected {
+		t.Fatalf("expected key existence to be %t, got %t", expected, exists)
+	}
+}
+
+func TestDeleteBasic(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+	key := "del-test"
+
+	// Set a value
+	err := Set(appID, key, "test")
+	testutil.AssertNoError(t, err, "set key")
+
+	// Verify it exists
+	assertKeyExists(t, appID, key, true)
+
+	// Delete the key
 	err = Delete(appID, key)
-	if err != nil {
-		t.Fatalf("failed to delete key: %v", err)
-	}
+	testutil.AssertNoError(t, err, "delete key")
 
-	exists, err = Exists(appID, key)
-	if err != nil {
-		t.Fatalf("failed to check if key exists: %v", err)
-	}
-	if exists {
-		t.Fatalf("key still exists")
-	}
+	// Verify it no longer exists
+	assertKeyExists(t, appID, key, false)
 }
 
 func TestDeleteKeypath(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// create a nested structure with multiple keys
+	// Create a nested structure with multiple keys
 	err := Set(appID, "delete-test/level1/value1", "first value")
-	if err != nil {
-		t.Fatalf("failed to set first value: %v", err)
-	}
+	testutil.AssertNoError(t, err, "set first value")
 
 	err = Set(appID, "delete-test/level1/value2", "second value")
-	if err != nil {
-		t.Fatalf("failed to set second value: %v", err)
-	}
+	testutil.AssertNoError(t, err, "set second value")
 
 	err = Set(appID, "delete-test/level2/nested", int64(42))
-	if err != nil {
-		t.Fatalf("failed to set nested value: %v", err)
-	}
+	testutil.AssertNoError(t, err, "set nested value")
+	defer Delete(appID, "delete-test")
 
-	// verify all values exist
-	exists, err := Exists(appID, "delete-test/level1/value1")
-	if err != nil {
-		t.Fatalf("failed to check existence: %v", err)
-	}
-	if !exists {
-		t.Fatal("value1 should exist")
-	}
+	// Verify all values exist
+	assertKeyExists(t, appID, "delete-test/level1/value1", true)
+	assertKeyExists(t, appID, "delete-test/level1/value2", true)
 
-	exists, err = Exists(appID, "delete-test/level1/value2")
-	if err != nil {
-		t.Fatalf("failed to check existence: %v", err)
-	}
-	if !exists {
-		t.Fatal("value2 should exist")
-	}
-
-	// delete one nested value
+	// Delete one nested value
 	err = Delete(appID, "delete-test/level1/value1")
-	if err != nil {
-		t.Fatalf("failed to delete nested key: %v", err)
-	}
+	testutil.AssertNoError(t, err, "delete nested key")
 
-	// verify it was deleted
-	exists, err = Exists(appID, "delete-test/level1/value1")
-	if err != nil {
-		t.Fatalf("failed to check existence: %v", err)
-	}
-	if exists {
-		t.Fatal("value1 should not exist after deletion")
-	}
+	// Verify it was deleted
+	assertKeyExists(t, appID, "delete-test/level1/value1", false)
 
-	// verify sibling value still exists
-	exists, err = Exists(appID, "delete-test/level1/value2")
-	if err != nil {
-		t.Fatalf("failed to check existence: %v", err)
-	}
-	if !exists {
-		t.Fatal("value2 should still exist")
-	}
+	// Verify sibling value still exists
+	assertKeyExists(t, appID, "delete-test/level1/value2", true)
 
 	value, err := Get(appID, "delete-test/level1/value2")
-	if err != nil {
-		t.Fatalf("failed to get sibling value: %v", err)
-	}
+	testutil.AssertNoError(t, err, "get sibling value")
 	if value.(string) != "second value" {
 		t.Fatalf("sibling value was modified: expected 'second value', got '%s'", value.(string))
 	}
 
-	// verify parent dictionary still exists
-	exists, err = Exists(appID, "delete-test/level1")
-	if err != nil {
-		t.Fatalf("failed to check parent existence: %v", err)
-	}
-	if !exists {
-		t.Fatal("parent dictionary should still exist")
-	}
+	// Verify parent dictionary still exists
+	assertKeyExists(t, appID, "delete-test/level1", true)
 
-	// verify other branch still exists
-	exists, err = Exists(appID, "delete-test/level2/nested")
-	if err != nil {
-		t.Fatalf("failed to check other branch: %v", err)
-	}
-	if !exists {
-		t.Fatal("other branch should still exist")
-	}
-
-	// clean up
-	err = Delete(appID, "delete-test")
-	if err != nil {
-		t.Fatalf("failed to clean up: %v", err)
-	}
+	// Verify other branch still exists
+	assertKeyExists(t, appID, "delete-test/level2/nested", true)
 }
 
 func TestExistsKeypath(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// set up a nested structure
+	// Set up a nested structure
 	err := Set(appID, "exists-test/level1/level2/value", "nested value")
-	if err != nil {
-		t.Fatalf("failed to set nested value: %v", err)
-	}
+	testutil.AssertNoError(t, err, "set nested value")
+	defer Delete(appID, "exists-test")
 
-	// test that full path exists
-	exists, err := Exists(appID, "exists-test/level1/level2/value")
-	if err != nil {
-		t.Fatalf("failed to check existence: %v", err)
-	}
-	if !exists {
-		t.Fatal("full keypath should exist")
-	}
+	// Test that full path exists
+	assertKeyExists(t, appID, "exists-test/level1/level2/value", true)
 
-	// test that intermediate paths exist
-	exists, err = Exists(appID, "exists-test")
-	if err != nil {
-		t.Fatalf("failed to check root existence: %v", err)
-	}
-	if !exists {
-		t.Fatal("root should exist")
-	}
+	// Test that intermediate paths exist
+	assertKeyExists(t, appID, "exists-test", true)
+	assertKeyExists(t, appID, "exists-test/level1", true)
 
-	exists, err = Exists(appID, "exists-test/level1")
-	if err != nil {
-		t.Fatalf("failed to check intermediate existence: %v", err)
-	}
-	if !exists {
-		t.Fatal("intermediate path should exist")
-	}
+	// Test that non-existent paths return false
+	assertKeyExists(t, appID, "exists-test/nonexistent", false)
+	assertKeyExists(t, appID, "exists-test/level1/wrong/path", false)
+}
 
-	// test that non-existent paths return false
-	exists, err = Exists(appID, "exists-test/nonexistent")
-	if err != nil {
-		t.Fatalf("failed to check non-existent key: %v", err)
-	}
-	if exists {
-		t.Fatal("non-existent key should not exist")
-	}
+func TestDeleteEmptyKeypath(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
 
-	exists, err = Exists(appID, "exists-test/level1/wrong/path")
-	if err != nil {
-		t.Fatalf("failed to check non-existent path: %v", err)
-	}
-	if exists {
-		t.Fatal("non-existent path should not exist")
-	}
+	// Test deleting with empty keypath
+	err := Delete(appID, "")
+	testutil.AssertError(t, err, "empty keypath")
+}
 
-	// clean up
-	err = Delete(appID, "exists-test")
-	if err != nil {
-		t.Fatalf("failed to clean up: %v", err)
-	}
+func TestDeleteKeypathOnlySlashes(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	// Test keypath with only slashes
+	err := Delete(appID, "///")
+	testutil.AssertError(t, err, "keypath with only slashes")
+}
+
+func TestDeleteKeypathNonDictSegment(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	// Set a simple string value
+	cleanup := setupTest(t, appID, "simple-string", "hello")
+	defer cleanup()
+
+	// Try to delete through a non-dict segment - should return error
+	err := Delete(appID, "simple-string/nested")
+	testutil.AssertError(t, err, "deleting through non-dict segment")
+}
+
+func TestDeleteMissingKey(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	// Deleting a non-existent key should not error (idempotent)
+	err := Delete(appID, "this-key-does-not-exist")
+	testutil.AssertNoError(t, err, "delete missing key should be idempotent")
+}
+
+func TestExistsEmptyKeypath(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	// Test empty keypath
+	_, err := Exists(appID, "")
+	testutil.AssertError(t, err, "empty keypath")
+}
+
+func TestExistsKeypathOnlySlashes(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	// Test keypath with only slashes
+	_, err := Exists(appID, "///")
+	testutil.AssertError(t, err, "keypath with only slashes")
 }
