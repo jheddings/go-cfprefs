@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -122,5 +123,28 @@ func TestEmptySlice(t *testing.T) {
 
 	if !reflect.DeepEqual(readVal, []any{}) {
 		t.Fatalf("expected empty slice, got '%v'", readVal)
+	}
+}
+
+func TestGetKeys(t *testing.T) {
+	keys := []string{"key1", "key2"}
+
+	for _, key := range keys {
+		err := Set("com.jheddings.cfprefs.testing", key, key+"-value")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer Delete("com.jheddings.cfprefs.testing", key)
+	}
+
+	prefKeys, err := GetKeys("com.jheddings.cfprefs.testing")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range keys {
+		if !slices.Contains(prefKeys, key) {
+			t.Fatalf("key %s not found in keys", key)
+		}
 	}
 }

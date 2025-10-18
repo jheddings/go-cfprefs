@@ -30,10 +30,10 @@ init:
 
 
 .PHONY: build
-build: build-cli
+build: cli
 
 
-.PHONY: build-cli
+.PHONY: cli
 build-cli: init
 	mkdir -p $(DISTDIR)
 	cd $(SRCDIR) && \
