@@ -50,7 +50,10 @@ func Get(appID, key string) (any, error) {
 
 // GetKeys retrieves all keys for the given appID.
 func GetKeys(appID string) ([]string, error) {
-	appIDRef := C.createCFString(C.CString(appID))
+	appIDRef, err := createCFStringRef(appID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CFString for appID: %w", err)
+	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopykeylist(_:_:_:)
