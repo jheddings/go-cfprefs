@@ -70,7 +70,7 @@ func convertGoToCFType(value any) (C.CFTypeRef, error) {
 
 	switch v := value.(type) {
 	case string:
-		return convertStringToCF(v), nil
+		return convertStringToCF(v)
 
 	case bool:
 		return convertBoolToCF(v), nil
@@ -129,11 +129,12 @@ func convertGoToCFType(value any) (C.CFTypeRef, error) {
 }
 
 // convertStringToCF converts a Go string to a CFStringRef
-func convertStringToCF(value string) C.CFTypeRef {
-	cStr := C.CString(value)
-	defer C.free(unsafe.Pointer(cStr))
-	strRef := C.createCFString(cStr)
-	return C.CFTypeRef(strRef)
+func convertStringToCF(value string) (C.CFTypeRef, error) {
+	strRef, err := createCFStringRef(value)
+	if err != nil {
+		return C.CFTypeRef(unsafe.Pointer(nil)), err
+	}
+	return C.CFTypeRef(strRef), nil
 }
 
 // convertBoolToCF converts a Go bool to a CFBooleanRef
@@ -162,14 +163,8 @@ func convertFloat64ToCF(value float64) C.CFTypeRef {
 
 // convertTimeToCF converts a Go time.Time to a CFDateRef
 func convertTimeToCF(value time.Time) C.CFTypeRef {
-	// CFAbsoluteTime is seconds since Jan 1, 2001 00:00:00 GMT
-	// Unix epoch is Jan 1, 1970 00:00:00 GMT
-	// Difference is 31 years = 978307200 seconds
-	// FIXME: perform the calculation instead of using a constant
-	const cfAbsoluteTimeIntervalSince1970 = 978307200.0
-
 	unixTime := float64(value.Unix()) + float64(value.Nanosecond())/1e9
-	absoluteTime := unixTime - cfAbsoluteTimeIntervalSince1970
+	absoluteTime := unixTime - CFAbsoluteTimeIntervalSince1970
 
 	dateRef := C.createCFDate(C.CFAbsoluteTime(absoluteTime))
 	return C.CFTypeRef(dateRef)
@@ -195,7 +190,7 @@ func convertSliceToCF(value []any) (C.CFTypeRef, error) {
 
 	cfValues := make([]unsafe.Pointer, len(value))
 	defer func() {
-		// Release all the CF objects we created
+		// release all CF objects we create
 		for _, ptr := range cfValues {
 			if ptr != nil {
 				C.CFRelease(C.CFTypeRef(ptr))
@@ -226,7 +221,7 @@ func convertMapToCF(value map[string]any) (C.CFTypeRef, error) {
 	cfValues := make([]unsafe.Pointer, 0, len(value))
 
 	defer func() {
-		// Release all the CF objects we created
+		// release all CF objects we create
 		for _, ptr := range cfKeys {
 			if ptr != nil {
 				C.CFRelease(C.CFTypeRef(ptr))
@@ -240,12 +235,15 @@ func convertMapToCF(value map[string]any) (C.CFTypeRef, error) {
 	}()
 
 	for k, v := range value {
-		keyRef := convertStringToCF(k)
+		keyRef, err := convertStringToCF(k)
+		if err != nil {
+			return C.CFTypeRef(unsafe.Pointer(nil)), fmt.Errorf("failed to convert map key '%s': %w", k, err)
+		}
 		cfKeys = append(cfKeys, unsafe.Pointer(keyRef))
 
 		valueRef, err := convertGoToCFType(v)
 		if err != nil {
-			return C.CFTypeRef(unsafe.Pointer(nil)), fmt.Errorf("failed to convert map value for key '%s': %w", k, err)
+			return C.CFTypeRef(unsafe.Pointer(nil)), fmt.Errorf("failed to convert value for key '%s': %w", k, err)
 		}
 		cfValues = append(cfValues, unsafe.Pointer(valueRef))
 	}
