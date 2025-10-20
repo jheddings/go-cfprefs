@@ -32,12 +32,40 @@ double getCFNumberAsFloat64(CFNumberRef numRef) {
     return value;
 }
 
+CFNumberType getCFNumberType(CFNumberRef numRef) {
+    return CFNumberGetType(numRef);
+}
+
 Boolean isCFNumberFloat(CFNumberRef numRef) {
     CFNumberType type = CFNumberGetType(numRef);
     return (type == kCFNumberFloatType ||
             type == kCFNumberDoubleType ||
             type == kCFNumberFloat32Type ||
             type == kCFNumberFloat64Type);
+}
+
+int8_t getCFNumberAsInt8(CFNumberRef numRef) {
+    int8_t value = 0;
+    CFNumberGetValue(numRef, kCFNumberSInt8Type, &value);
+    return value;
+}
+
+int16_t getCFNumberAsInt16(CFNumberRef numRef) {
+    int16_t value = 0;
+    CFNumberGetValue(numRef, kCFNumberSInt16Type, &value);
+    return value;
+}
+
+int32_t getCFNumberAsInt32(CFNumberRef numRef) {
+    int32_t value = 0;
+    CFNumberGetValue(numRef, kCFNumberSInt32Type, &value);
+    return value;
+}
+
+float getCFNumberAsFloat32(CFNumberRef numRef) {
+    float value = 0;
+    CFNumberGetValue(numRef, kCFNumberFloat32Type, &value);
+    return value;
 }
 
 CFIndex getCFArrayCount(CFArrayRef arr) {
@@ -128,6 +156,11 @@ func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
 	}
 }
 
+// converts a CFBooleanRef to a Go bool
+func convertCFBooleanToGo(boolRef C.CFBooleanRef) bool {
+	return C.getCFBoolean(boolRef) != 0
+}
+
 // converts a CFStringRef to a Go string
 func convertCFStringToGo(strRef C.CFStringRef) (string, error) {
 	cStr := C.cfStringToC(strRef)
@@ -138,17 +171,74 @@ func convertCFStringToGo(strRef C.CFStringRef) (string, error) {
 	return C.GoString(cStr), nil
 }
 
-// converts a CFNumberRef to either int64 or float64
+// converts a CFNumberRef to the appropriate Go numeric type
 func convertCFNumberToGo(numRef C.CFNumberRef) (any, error) {
-	if C.isCFNumberFloat(numRef) != 0 {
+	numberType := C.getCFNumberType(numRef)
+
+	switch numberType {
+	case C.kCFNumberSInt8Type, C.kCFNumberCharType:
+		return int8(C.getCFNumberAsInt8(numRef)), nil
+
+	case C.kCFNumberSInt16Type, C.kCFNumberShortType:
+		return int16(C.getCFNumberAsInt16(numRef)), nil
+
+	case C.kCFNumberSInt32Type, C.kCFNumberIntType:
+		return int32(C.getCFNumberAsInt32(numRef)), nil
+
+	case C.kCFNumberSInt64Type, C.kCFNumberLongLongType:
+		return int64(C.getCFNumberAsInt64(numRef)), nil
+
+	case C.kCFNumberFloat32Type, C.kCFNumberFloatType:
+		return float32(C.getCFNumberAsFloat32(numRef)), nil
+
+	case C.kCFNumberFloat64Type, C.kCFNumberDoubleType, C.kCFNumberCGFloatType:
 		return float64(C.getCFNumberAsFloat64(numRef)), nil
+
+	default:
+		if C.isCFNumberFloat(numRef) != 0 {
+			return float64(C.getCFNumberAsFloat64(numRef)), nil
+		}
+		return int64(C.getCFNumberAsInt64(numRef)), nil
 	}
-	return int64(C.getCFNumberAsInt64(numRef)), nil
 }
 
-// converts a CFBooleanRef to a Go bool
-func convertCFBooleanToGo(boolRef C.CFBooleanRef) bool {
-	return C.getCFBoolean(boolRef) != 0
+// converts a CFDateRef to a Go time.Time
+func convertCFDateToGo(dateRef C.CFDateRef) time.Time {
+	absoluteTime := float64(C.getCFDateAbsoluteTime(dateRef))
+	unixTime := absoluteTime + CFAbsoluteTimeIntervalSince1970
+
+	seconds := int64(unixTime)
+	nanoseconds := int64((unixTime - float64(seconds)) * 1e9)
+
+	return time.Unix(seconds, nanoseconds)
+}
+
+// converts a complex CFDataRef to a Go value
+func convertCFDataToGo(dataRef C.CFDataRef) any {
+	length := int(C.getCFDataLength(dataRef))
+	if length == 0 {
+		return []byte{}
+	}
+
+	bytes := C.getCFDataBytes(dataRef)
+	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
+
+	// first, try to deserialize as property list
+	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
+		defer C.CFRelease(C.CFTypeRef(plist))
+		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
+			return value
+		}
+	}
+
+	// next, try to deserialize as JSON
+	var jsonValue any
+	if err := json.Unmarshal(data, &jsonValue); err == nil {
+		return jsonValue
+	}
+
+	// neither worked... return as raw bytes
+	return data
 }
 
 // converts a CFArrayRef to a Go slice
@@ -213,43 +303,4 @@ func convertCFDictionaryToGo(dictRef C.CFDictionaryRef) (map[string]any, error) 
 	}
 
 	return result, nil
-}
-
-// converts a complex CFDataRef to a Go value
-func convertCFDataToGo(dataRef C.CFDataRef) any {
-	length := int(C.getCFDataLength(dataRef))
-	if length == 0 {
-		return []byte{}
-	}
-
-	bytes := C.getCFDataBytes(dataRef)
-	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
-
-	// first, try to deserialize as property list
-	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
-		defer C.CFRelease(C.CFTypeRef(plist))
-		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
-			return value
-		}
-	}
-
-	// next, try to deserialize as JSON
-	var jsonValue any
-	if err := json.Unmarshal(data, &jsonValue); err == nil {
-		return jsonValue
-	}
-
-	// neither worked... return as raw bytes
-	return data
-}
-
-// converts a CFDateRef to a Go time.Time
-func convertCFDateToGo(dateRef C.CFDateRef) time.Time {
-	absoluteTime := float64(C.getCFDateAbsoluteTime(dateRef))
-	unixTime := absoluteTime + CFAbsoluteTimeIntervalSince1970
-
-	seconds := int64(unixTime)
-	nanoseconds := int64((unixTime - float64(seconds)) * 1e9)
-
-	return time.Unix(seconds, nanoseconds)
 }
