@@ -26,13 +26,13 @@ func Get(appID, keypath string) (any, error) {
 		// current value must be a map to traverse further
 		dict, ok := value.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' is not a dictionary", keypath, appID, segments[i-1])
+			return nil, &KeyNotFoundError{AppID: appID, Key: keypath, Message: fmt.Sprintf("segment '%s' is not a dictionary", segments[i-1])}
 		}
 
 		// get the next value from the dictionary
 		value, ok = dict[segments[i]]
 		if !ok {
-			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' not found in dictionary", keypath, appID, segments[i])
+			return nil, &KeyNotFoundError{AppID: appID, Key: keypath, Message: fmt.Sprintf("segment '%s' not found in dictionary", segments[i])}
 		}
 	}
 
@@ -55,7 +55,7 @@ func GetStr(appID, keypath string) (string, error) {
 
 	strValue, ok := value.(string)
 	if !ok {
-		return "", fmt.Errorf("type mismatch: %s [%s] - expected string, got %T", keypath, appID, value)
+		return "", &TypeMismatchError{AppID: appID, Key: keypath, Type: string(""), Value: value}
 	}
 
 	return strValue, nil
@@ -71,7 +71,7 @@ func GetBool(appID, keypath string) (bool, error) {
 
 	boolValue, ok := value.(bool)
 	if !ok {
-		return false, fmt.Errorf("type mismatch: %s [%s] - expected bool, got %T", keypath, appID, value)
+		return false, &TypeMismatchError{AppID: appID, Key: keypath, Type: bool(false), Value: value}
 	}
 
 	return boolValue, nil
@@ -87,7 +87,7 @@ func GetInt(appID, keypath string) (int64, error) {
 
 	intValue, ok := value.(int64)
 	if !ok {
-		return 0, fmt.Errorf("type mismatch: %s [%s] - expected int64, got %T", keypath, appID, value)
+		return 0, &TypeMismatchError{AppID: appID, Key: keypath, Type: int64(0), Value: value}
 	}
 
 	return intValue, nil
@@ -103,7 +103,7 @@ func GetFloat(appID, keypath string) (float64, error) {
 
 	floatValue, ok := value.(float64)
 	if !ok {
-		return 0.0, fmt.Errorf("type mismatch: %s [%s] - expected float64, got %T", keypath, appID, value)
+		return 0.0, &TypeMismatchError{AppID: appID, Key: keypath, Type: float64(0.0), Value: value}
 	}
 
 	return floatValue, nil
@@ -119,7 +119,7 @@ func GetDate(appID, keypath string) (time.Time, error) {
 
 	dateValue, ok := value.(time.Time)
 	if !ok {
-		return time.Time{}, fmt.Errorf("type mismatch: %s [%s] - expected time.Time, got %T", keypath, appID, value)
+		return time.Time{}, &TypeMismatchError{AppID: appID, Key: keypath, Type: time.Time{}, Value: value}
 	}
 
 	return dateValue, nil
@@ -135,7 +135,7 @@ func GetSlice(appID, keypath string) ([]any, error) {
 
 	sliceValue, ok := value.([]any)
 	if !ok {
-		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []any, got %T", keypath, appID, value)
+		return nil, &TypeMismatchError{AppID: appID, Key: keypath, Type: []any{}, Value: value}
 	}
 
 	return sliceValue, nil
@@ -151,7 +151,7 @@ func GetMap(appID, keypath string) (map[string]any, error) {
 
 	mapValue, ok := value.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("type mismatch: %s [%s] - expected map[string]any, got %T", keypath, appID, value)
+		return nil, &TypeMismatchError{AppID: appID, Key: keypath, Type: map[string]any{}, Value: value}
 	}
 
 	return mapValue, nil
@@ -167,7 +167,7 @@ func GetData(appID, keypath string) ([]byte, error) {
 
 	dataValue, ok := value.([]byte)
 	if !ok {
-		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []byte, got %T", keypath, appID, value)
+		return nil, &TypeMismatchError{AppID: appID, Key: keypath, Type: []byte{}, Value: value}
 	}
 
 	return dataValue, nil
