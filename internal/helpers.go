@@ -17,13 +17,9 @@ extern CFStringRef createCFString(const char *str);
 */
 import "C"
 
-// nilCFType is a nil CFTypeRef.
+// nil CF types used to represent null values in the CGO API.
 var nilCFType = C.CFTypeRef(unsafe.Pointer(nil))
-
-// nilCFString is a nil CFStringRef.
 var nilCFString = C.CFStringRef(unsafe.Pointer(nil))
-
-// nilCFArray is a nil CFArrayRef.
 var nilCFArray = C.CFArrayRef(unsafe.Pointer(nil))
 
 // CFAbsoluteTimeIntervalSince1970 is the offset between CoreFoundation's epoch
