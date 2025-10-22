@@ -3,17 +3,17 @@ package cfprefs
 import "fmt"
 
 type KeyNotFoundError struct {
-	AppID   string
-	Key     string
-	Message string
+	AppID string
+	Key   string
+	Msg   string
 }
 
 func (e *KeyNotFoundError) Error() string {
-	if e.Message == "" {
+	if e.Msg == "" {
 		return fmt.Sprintf("key not found: %s [%s]", e.Key, e.AppID)
 	}
 
-	return fmt.Sprintf("key not found: %s [%s] - %s", e.Key, e.AppID, e.Message)
+	return fmt.Sprintf("key not found: %s [%s] - %s", e.Key, e.AppID, e.Msg)
 }
 
 type TypeMismatchError struct {

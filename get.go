@@ -26,13 +26,13 @@ func Get(appID, keypath string) (any, error) {
 		// current value must be a map to traverse further
 		dict, ok := value.(map[string]any)
 		if !ok {
-			return nil, &KeyNotFoundError{AppID: appID, Key: keypath, Message: fmt.Sprintf("segment '%s' is not a dictionary", segments[i-1])}
+			return nil, &KeyNotFoundError{AppID: appID, Key: keypath, Msg: fmt.Sprintf("segment '%s' is not a dictionary", segments[i-1])}
 		}
 
 		// get the next value from the dictionary
 		value, ok = dict[segments[i]]
 		if !ok {
-			return nil, &KeyNotFoundError{AppID: appID, Key: keypath, Message: fmt.Sprintf("segment '%s' not found in dictionary", segments[i])}
+			return nil, &KeyNotFoundError{AppID: appID, Key: keypath, Msg: fmt.Sprintf("segment '%s' not found in dictionary", segments[i])}
 		}
 	}
 
