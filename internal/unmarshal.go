@@ -150,10 +150,9 @@ func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
 
 	case C.CFDataGetTypeID():
 		return convertCFDataToGo(C.CFDataRef(cfValue)), nil
-
-	default:
-		return nil, fmt.Errorf("unsupported CFType: %v", typeID)
 	}
+
+	return nil, fmt.Errorf("unsupported CFType: %v", typeID)
 }
 
 // converts a CFBooleanRef to a Go bool
@@ -193,13 +192,9 @@ func convertCFNumberToGo(numRef C.CFNumberRef) (any, error) {
 
 	case C.kCFNumberFloat64Type, C.kCFNumberDoubleType, C.kCFNumberCGFloatType:
 		return float64(C.getCFNumberAsFloat64(numRef)), nil
-
-	default:
-		if C.isCFNumberFloat(numRef) != 0 {
-			return float64(C.getCFNumberAsFloat64(numRef)), nil
-		}
-		return int64(C.getCFNumberAsInt64(numRef)), nil
 	}
+
+	return nil, fmt.Errorf("unsupported CFNumber type: %v", numberType)
 }
 
 // converts a CFDateRef to a Go time.Time
@@ -250,7 +245,7 @@ func convertCFArrayToGo(arrRef C.CFArrayRef) ([]any, error) {
 		cfValue := C.getCFArrayValueAtIndex(arrRef, C.CFIndex(i))
 		value, err := convertCFTypeToGo(cfValue)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+			return nil, CFTypeError(err).WithMsgF("failed to convert array element %d", i)
 		}
 		result[i] = value
 	}
@@ -267,7 +262,7 @@ func convertCFArrayToGoStr(arrRef C.CFArrayRef) ([]string, error) {
 		cfValue := C.getCFArrayValueAtIndex(arrRef, C.CFIndex(i))
 		value, err := convertCFStringToGo(C.CFStringRef(cfValue))
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+			return nil, CFTypeError(err).WithMsgF("failed to convert array element %d", i)
 		}
 		result[i] = value
 	}
@@ -290,13 +285,13 @@ func convertCFDictionaryToGo(dictRef C.CFDictionaryRef) (map[string]any, error) 
 		keyRef := C.CFStringRef(keys[i])
 		keyStr, err := convertCFStringToGo(keyRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert dictionary key: %w", err)
+			return nil, CFTypeError(err).WithMsg("failed to convert dictionary key to string")
 		}
 
 		valueRef := C.getCFDictionaryValue(dictRef, keyRef)
 		value, err := convertCFTypeToGo(valueRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert dictionary value for key '%s': %w", keyStr, err)
+			return nil, CFTypeError(err).WithMsgF("failed to convert dictionary value for key '%s'", keyStr)
 		}
 
 		result[keyStr] = value
