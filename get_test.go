@@ -1,7 +1,6 @@
 package cfprefs
 
 import (
-	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -80,7 +79,8 @@ func TestGetFloat(t *testing.T) {
 
 	value, err := GetFloat(appID, "float-test")
 	testutil.AssertNoError(t, err, "GetFloat")
-	if math.Abs(value-testValue) > 1e-10 {
+
+	if !testutil.ValuesEqualApprox(testValue, value) {
 		t.Fatalf("expected %f, got %f", testValue, value)
 	}
 }
@@ -248,6 +248,7 @@ func TestQuery(t *testing.T) {
 	t.Run("Simple field access", func(t *testing.T) {
 		value, err := GetQ(appID, "userData", "$.name")
 		testutil.AssertNoError(t, err, "get user name")
+
 		if value != "John Doe" {
 			t.Errorf("expected 'John Doe', got %v", value)
 		}
@@ -257,9 +258,8 @@ func TestQuery(t *testing.T) {
 		value, err := GetQ(appID, "userData", "$.age")
 		testutil.AssertNoError(t, err, "get user age")
 
-		// CoreFoundation may return int64 instead of int
-		if value != 30 && value != int64(30) {
-			t.Errorf("expected 30, got %v", value)
+		if !testutil.ValuesEqualApprox(int64(30), value) {
+			t.Fatalf("expected 30, got %v", value)
 		}
 	})
 
@@ -267,9 +267,8 @@ func TestQuery(t *testing.T) {
 		value, err := GetQ(appID, "userData", "$")
 		testutil.AssertNoError(t, err, "get root object")
 
-		// Should return the entire object
-		if value == nil {
-			t.Errorf("expected root object, got nil")
+		if !testutil.ValuesEqualApprox(simpleData, value) {
+			t.Fatalf("expected %v, got %v", simpleData, value)
 		}
 	})
 
