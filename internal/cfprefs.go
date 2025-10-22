@@ -4,7 +4,6 @@ package internal
 
 import (
 	"fmt"
-	"unsafe"
 )
 
 // TODO: fail gracefully if not running on macOS
@@ -35,7 +34,7 @@ func Get(appID, key string) (any, error) {
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopyappvalue(_:_:)
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
-	if value == C.CFTypeRef(unsafe.Pointer(nil)) {
+	if value == nilCFType {
 		return nil, fmt.Errorf("key not found: %s [%s]", key, appID)
 	}
 	defer C.CFRelease(value)
@@ -58,7 +57,7 @@ func GetKeys(appID string) ([]string, error) {
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopykeylist(_:_:_:)
 	keysCF := C.CFPreferencesCopyKeyList(appIDRef, C.kCFPreferencesCurrentUser, C.kCFPreferencesAnyHost)
-	if unsafe.Pointer(keysCF) == nil {
+	if keysCF == nilCFArray {
 		return nil, fmt.Errorf("app not found: %s", appID)
 	}
 	defer C.CFRelease(C.CFTypeRef(keysCF))
@@ -90,7 +89,7 @@ func Set(appID, key string, value any) error {
 		return CFTypeError(err).WithMsg("failed to convert value")
 	}
 	defer func() {
-		if valueRef != C.CFTypeRef(unsafe.Pointer(nil)) {
+		if valueRef != nilCFType {
 			C.CFRelease(valueRef)
 		}
 	}()
@@ -122,8 +121,7 @@ func Delete(appID, key string) error {
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencessetappvalue(_:_:_:)
-	nilRef := C.CFTypeRef(unsafe.Pointer(nil))
-	C.CFPreferencesSetAppValue(keyRef, nilRef, appIDRef)
+	C.CFPreferencesSetAppValue(keyRef, nilCFType, appIDRef)
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencesappsynchronize(_:)
 	success := C.CFPreferencesAppSynchronize(appIDRef)
@@ -150,7 +148,7 @@ func Exists(appID, key string) (bool, error) {
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopyappvalue(_:_:)
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
-	if value == C.CFTypeRef(unsafe.Pointer(nil)) {
+	if value == nilCFType {
 		return false, nil
 	}
 	defer C.CFRelease(value)

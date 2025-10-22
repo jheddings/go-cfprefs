@@ -123,7 +123,7 @@ import "C"
 
 // converts a CFTypeRef to a native Go type
 func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
-	if unsafe.Pointer(cfValue) == nil {
+	if cfValue == nilCFType {
 		return nil, nil
 	}
 
@@ -219,7 +219,7 @@ func convertCFDataToGo(dataRef C.CFDataRef) any {
 	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
 
 	// first, try to deserialize as property list
-	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
+	if plist := C.tryDeserializePlist(dataRef); plist != nilCFType {
 		defer C.CFRelease(C.CFTypeRef(plist))
 		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
 			return value

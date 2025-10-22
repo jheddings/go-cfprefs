@@ -81,7 +81,7 @@ import "C"
 // convertGoToCFType converts a native Go type to a CFTypeRef
 func convertGoToCFType(value any) (C.CFTypeRef, error) {
 	if value == nil {
-		return C.CFTypeRef(unsafe.Pointer(nil)), nil
+		return nilCFType, nil
 	}
 
 	switch v := value.(type) {
@@ -146,14 +146,14 @@ func convertGoToCFType(value any) (C.CFTypeRef, error) {
 		return convertMapToCF(v)
 	}
 
-	return C.CFTypeRef(unsafe.Pointer(nil)), fmt.Errorf("unsupported Go type: %T", value)
+	return nilCFType, fmt.Errorf("unsupported Go type: %T", value)
 }
 
 // convertStringToCF converts a Go string to a CFStringRef
 func convertStringToCF(value string) (C.CFTypeRef, error) {
 	strRef, err := createCFStringRef(value)
 	if err != nil {
-		return C.CFTypeRef(unsafe.Pointer(nil)), err
+		return nilCFType, err
 	}
 	return C.CFTypeRef(strRef), nil
 }
@@ -246,7 +246,7 @@ func convertSliceToCF(value []any) (C.CFTypeRef, error) {
 	for i, v := range value {
 		cfValue, err := convertGoToCFType(v)
 		if err != nil {
-			return C.CFTypeRef(unsafe.Pointer(nil)), CFTypeError(err).WithMsgF("failed to convert slice element %d", i)
+			return nilCFType, CFTypeError(err).WithMsgF("failed to convert slice element %d", i)
 		}
 		cfValues[i] = unsafe.Pointer(cfValue)
 	}
@@ -282,13 +282,13 @@ func convertMapToCF(value map[string]any) (C.CFTypeRef, error) {
 	for k, v := range value {
 		keyRef, err := convertStringToCF(k)
 		if err != nil {
-			return C.CFTypeRef(unsafe.Pointer(nil)), CFTypeError(err).WithMsgF("failed to convert map key '%s'", k)
+			return nilCFType, CFTypeError(err).WithMsgF("failed to convert map key '%s'", k)
 		}
 		cfKeys = append(cfKeys, unsafe.Pointer(keyRef))
 
 		valueRef, err := convertGoToCFType(v)
 		if err != nil {
-			return C.CFTypeRef(unsafe.Pointer(nil)), CFTypeError(err).WithMsgF("failed to convert value for key '%s'", k)
+			return nilCFType, CFTypeError(err).WithMsgF("failed to convert value for key '%s'", k)
 		}
 		cfValues = append(cfValues, unsafe.Pointer(valueRef))
 	}

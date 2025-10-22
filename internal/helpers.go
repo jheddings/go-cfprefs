@@ -17,6 +17,15 @@ extern CFStringRef createCFString(const char *str);
 */
 import "C"
 
+// nilCFType is a nil CFTypeRef.
+var nilCFType = C.CFTypeRef(unsafe.Pointer(nil))
+
+// nilCFString is a nil CFStringRef.
+var nilCFString = C.CFStringRef(unsafe.Pointer(nil))
+
+// nilCFArray is a nil CFArrayRef.
+var nilCFArray = C.CFArrayRef(unsafe.Pointer(nil))
+
 // CFAbsoluteTimeIntervalSince1970 is the offset between CoreFoundation's epoch
 // (Jan 1, 2001 00:00:00 GMT) and Unix epoch (Jan 1, 1970 00:00:00 GMT).
 // This is calculated as the number of seconds between these two dates.
@@ -30,8 +39,8 @@ func createCFStringRef(str string) (C.CFStringRef, error) {
 	defer C.free(unsafe.Pointer(cStr))
 
 	strRef := C.createCFString(cStr)
-	if strRef == C.CFStringRef(unsafe.Pointer(nil)) {
-		return C.CFStringRef(unsafe.Pointer(nil)), fmt.Errorf("failed to create CFString from: %s", str)
+	if strRef == nilCFString {
+		return nilCFString, fmt.Errorf("failed to create CFString from: %s", str)
 	}
 
 	return strRef, nil
