@@ -25,56 +25,6 @@ func setupTest(t *testing.T, appID, key string, value any) func() {
 	}
 }
 
-func TestGetKeypath(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	testValue := map[string]any{
-		"string": "hello",
-		"number": int64(42),
-		"float":  3.14,
-		"bool":   true,
-	}
-
-	cleanup := setupTest(t, appID, "map-test", testValue)
-	defer cleanup()
-
-	// retrieve a nested value using keypath
-	value, err := Get(appID, "map-test/string")
-	testutil.AssertNoError(t, err, "get nested string")
-
-	strValue, ok := value.(string)
-	if !ok {
-		t.Fatalf("value is not a string: got %T", value)
-	}
-	if strValue != "hello" {
-		t.Fatalf("value does not match: expected 'hello', got '%s'", strValue)
-	}
-
-	// retrieve another nested value
-	value, err = Get(appID, "map-test/number")
-	testutil.AssertNoError(t, err, "get nested number")
-
-	numValue, ok := value.(int64)
-	if !ok {
-		t.Fatalf("value is not an int64: got %T", value)
-	}
-	if numValue != 42 {
-		t.Fatalf("value does not match: expected 42, got %d", numValue)
-	}
-
-	// error case: non-existent key in path
-	_, err = Get(appID, "map-test/nonexistent")
-	testutil.AssertError(t, err, "non-existent key in path")
-
-	// retrieve the whole map without keypath (backward compatibility)
-	value, err = Get(appID, "map-test")
-	testutil.AssertNoError(t, err, "get whole map")
-
-	if !reflect.DeepEqual(value, testValue) {
-		t.Fatalf("map does not match: expected %v, got %v", testValue, value)
-	}
-}
-
 func TestGetStr(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 	testValue := "hello"
@@ -281,4 +231,60 @@ func TestGetKeypathNonDictSegment(t *testing.T) {
 	// Try to traverse through it as if it were a dictionary
 	_, err := Get(appID, "simple-string/nested")
 	testutil.AssertError(t, err, "traversing non-dict segment")
+}
+
+func TestQuery(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	simpleData := map[string]any{
+		"name": "John Doe",
+		"age":  30,
+		"city": "Anytown",
+	}
+
+	cleanup := setupTest(t, appID, "userData", simpleData)
+	defer cleanup()
+
+	t.Run("Simple field access", func(t *testing.T) {
+		value, err := GetQ(appID, "userData", "$.name")
+		testutil.AssertNoError(t, err, "get user name")
+		if value != "John Doe" {
+			t.Errorf("expected 'John Doe', got %v", value)
+		}
+	})
+
+	t.Run("Numeric field access", func(t *testing.T) {
+		value, err := GetQ(appID, "userData", "$.age")
+		testutil.AssertNoError(t, err, "get user age")
+
+		// CoreFoundation may return int64 instead of int
+		if value != 30 && value != int64(30) {
+			t.Errorf("expected 30, got %v", value)
+		}
+	})
+
+	t.Run("Root object access", func(t *testing.T) {
+		value, err := GetQ(appID, "userData", "$")
+		testutil.AssertNoError(t, err, "get root object")
+
+		// Should return the entire object
+		if value == nil {
+			t.Errorf("expected root object, got nil")
+		}
+	})
+
+	t.Run("Non-existent field", func(t *testing.T) {
+		_, err := GetQ(appID, "userData", "$.nonexistent")
+		testutil.AssertError(t, err, "non-existent field should return error")
+	})
+
+	t.Run("Non-existent root key", func(t *testing.T) {
+		_, err := GetQ(appID, "nonexistent", "$.name")
+		testutil.AssertError(t, err, "non-existent root key should return error")
+	})
+
+	t.Run("Invalid JSONPath", func(t *testing.T) {
+		_, err := GetQ(appID, "userData", "$.name[invalid")
+		testutil.AssertError(t, err, "invalid JSONPath should return error")
+	})
 }

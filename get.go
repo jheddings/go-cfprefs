@@ -2,42 +2,12 @@ package cfprefs
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/PaesslerAG/jsonpath"
 	"github.com/jheddings/go-cfprefs/internal"
 )
-
-// Get retrieves a preference value for the given keypath and application ID.
-// Returns the value at the specified path or an error if not found.
-func Get(appID, keypath string) (any, error) {
-	segments, err := splitKeypath(keypath)
-	if err != nil {
-		return nil, err
-	}
-
-	// start with the root value
-	value, err := internal.Get(appID, segments[0])
-	if err != nil {
-		return nil, err
-	}
-
-	// traverse the remaining path segments
-	for i := 1; i < len(segments); i++ {
-		// current value must be a map to traverse further
-		dict, ok := value.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' is not a dictionary", keypath, appID, segments[i-1])
-		}
-
-		// get the next value from the dictionary
-		value, ok = dict[segments[i]]
-		if !ok {
-			return nil, fmt.Errorf("key not found: %s [%s] - segment '%s' not found in dictionary", keypath, appID, segments[i])
-		}
-	}
-
-	return value, nil
-}
 
 // GetKeys retrieves all keys for the given appID.
 // Returns an error if the appID is not found.
@@ -45,17 +15,81 @@ func GetKeys(appID string) ([]string, error) {
 	return internal.GetKeys(appID)
 }
 
-// GetStr retrieves a string preference value for the given keypath and application ID.
+// Get retrieves a preference value for the given key and application ID.
+// Returns the value at the specified path or an error if not found.
+func Get(appID, key string) (any, error) {
+	value, err := internal.Get(appID, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
+}
+
+// GetQ retrieves a value using JSONPath syntax within a specific root key.
+// The JSONPath query is applied to the value stored under the rootKey.
+// Returns the result of the JSONPath query or an error if not found.
+//
+// Example usage:
+//
+//	// Get a nested value: $.user.name
+//	value, err := GetQ("com.example.app", "userData", "$.user.name")
+//
+//	// Get all items in an array: $.items[*]
+//	items, err := GetQ("com.example.app", "data", "$.items[*]")
+//
+//	// Filter array items: $.items[?(@.active == true)]
+//	activeItems, err := GetQ("com.example.app", "data", "$.items[?(@.active == true)]")
+func GetQ(appID, rootKey, query string) (any, error) {
+	rootValue, err := internal.Get(appID, rootKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get root value for key '%s': %w", rootKey, err)
+	}
+
+	if query == "" {
+		return rootValue, nil
+	}
+
+	if !strings.HasPrefix(query, "$.") {
+		query = "$." + query
+	}
+
+	result, err := jsonpath.Get(query, rootValue)
+	if err != nil {
+		return nil, fmt.Errorf("JSONPath query failed for path '%s': %w", query, err)
+	}
+
+	return result, nil
+}
+
+// GetStr retrieves a string preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a string.
-func GetStr(appID, keypath string) (string, error) {
-	value, err := Get(appID, keypath)
+func GetStr(appID, key string) (string, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return "", err
 	}
 
 	strValue, ok := value.(string)
 	if !ok {
-		return "", fmt.Errorf("type mismatch: %s [%s] - expected string, got %T", keypath, appID, value)
+		return "", fmt.Errorf("type mismatch: %s [%s] - expected string, got %T", key, appID, value)
+	}
+
+	return strValue, nil
+}
+
+// GetStrQ retrieves a string preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not a string.
+func GetStrQ(appID, key, query string) (string, error) {
+	value, err := GetQ(appID, key, query)
+
+	if err != nil {
+		return "", err
+	}
+
+	strValue, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("type mismatch: %s [%s] - expected string, got %T", key, appID, value)
 	}
 
 	return strValue, nil
@@ -63,15 +97,31 @@ func GetStr(appID, keypath string) (string, error) {
 
 // GetBool retrieves a boolean preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a boolean.
-func GetBool(appID, keypath string) (bool, error) {
-	value, err := Get(appID, keypath)
+func GetBool(appID, key string) (bool, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return false, err
 	}
 
 	boolValue, ok := value.(bool)
 	if !ok {
-		return false, fmt.Errorf("type mismatch: %s [%s] - expected bool, got %T", keypath, appID, value)
+		return false, fmt.Errorf("type mismatch: %s [%s] - expected bool, got %T", key, appID, value)
+	}
+
+	return boolValue, nil
+}
+
+// GetBoolQ retrieves a boolean preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not a boolean.
+func GetBoolQ(appID, key, query string) (bool, error) {
+	value, err := GetQ(appID, key, query)
+	if err != nil {
+		return false, err
+	}
+
+	boolValue, ok := value.(bool)
+	if !ok {
+		return false, fmt.Errorf("type mismatch: %s [%s] - expected bool, got %T", key, appID, value)
 	}
 
 	return boolValue, nil
@@ -79,15 +129,31 @@ func GetBool(appID, keypath string) (bool, error) {
 
 // GetInt retrieves an integer preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not an integer.
-func GetInt(appID, keypath string) (int64, error) {
-	value, err := Get(appID, keypath)
+func GetInt(appID, key string) (int64, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return 0, err
 	}
 
 	intValue, ok := value.(int64)
 	if !ok {
-		return 0, fmt.Errorf("type mismatch: %s [%s] - expected int64, got %T", keypath, appID, value)
+		return 0, fmt.Errorf("type mismatch: %s [%s] - expected int64, got %T", key, appID, value)
+	}
+
+	return intValue, nil
+}
+
+// GetIntQ retrieves an integer preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not an integer.
+func GetIntQ(appID, key, query string) (int64, error) {
+	value, err := GetQ(appID, key, query)
+	if err != nil {
+		return 0, err
+	}
+
+	intValue, ok := value.(int64)
+	if !ok {
+		return 0, fmt.Errorf("type mismatch: %s [%s] - expected int64, got %T", key, appID, value)
 	}
 
 	return intValue, nil
@@ -95,15 +161,31 @@ func GetInt(appID, keypath string) (int64, error) {
 
 // GetFloat retrieves a float preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a float.
-func GetFloat(appID, keypath string) (float64, error) {
-	value, err := Get(appID, keypath)
+func GetFloat(appID, key string) (float64, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return 0.0, err
 	}
 
 	floatValue, ok := value.(float64)
 	if !ok {
-		return 0.0, fmt.Errorf("type mismatch: %s [%s] - expected float64, got %T", keypath, appID, value)
+		return 0.0, fmt.Errorf("type mismatch: %s [%s] - expected float64, got %T", key, appID, value)
+	}
+
+	return floatValue, nil
+}
+
+// GetFloatQ retrieves a float preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not a float.
+func GetFloatQ(appID, key, query string) (float64, error) {
+	value, err := GetQ(appID, key, query)
+	if err != nil {
+		return 0.0, err
+	}
+
+	floatValue, ok := value.(float64)
+	if !ok {
+		return 0.0, fmt.Errorf("type mismatch: %s [%s] - expected float64, got %T", key, appID, value)
 	}
 
 	return floatValue, nil
@@ -111,15 +193,31 @@ func GetFloat(appID, keypath string) (float64, error) {
 
 // GetDate retrieves a time.Time preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a time.Time.
-func GetDate(appID, keypath string) (time.Time, error) {
-	value, err := Get(appID, keypath)
+func GetDate(appID, key string) (time.Time, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return time.Time{}, err
 	}
 
 	dateValue, ok := value.(time.Time)
 	if !ok {
-		return time.Time{}, fmt.Errorf("type mismatch: %s [%s] - expected time.Time, got %T", keypath, appID, value)
+		return time.Time{}, fmt.Errorf("type mismatch: %s [%s] - expected time.Time, got %T", key, appID, value)
+	}
+
+	return dateValue, nil
+}
+
+// GetDateQ retrieves a time.Time preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not a time.Time.
+func GetDateQ(appID, key, query string) (time.Time, error) {
+	value, err := GetQ(appID, key, query)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	dateValue, ok := value.(time.Time)
+	if !ok {
+		return time.Time{}, fmt.Errorf("type mismatch: %s [%s] - expected time.Time, got %T", key, appID, value)
 	}
 
 	return dateValue, nil
@@ -127,15 +225,31 @@ func GetDate(appID, keypath string) (time.Time, error) {
 
 // GetSlice retrieves a []any preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a []any.
-func GetSlice(appID, keypath string) ([]any, error) {
-	value, err := Get(appID, keypath)
+func GetSlice(appID, key string) ([]any, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return nil, err
 	}
 
 	sliceValue, ok := value.([]any)
 	if !ok {
-		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []any, got %T", keypath, appID, value)
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []any, got %T", key, appID, value)
+	}
+
+	return sliceValue, nil
+}
+
+// GetSliceQ retrieves a []any preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not a []any.
+func GetSliceQ(appID, key, query string) ([]any, error) {
+	value, err := GetQ(appID, key, query)
+	if err != nil {
+		return nil, err
+	}
+
+	sliceValue, ok := value.([]any)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []any, got %T", key, appID, value)
 	}
 
 	return sliceValue, nil
@@ -143,15 +257,31 @@ func GetSlice(appID, keypath string) ([]any, error) {
 
 // GetMap retrieves a map[string]any preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a map[string]any.
-func GetMap(appID, keypath string) (map[string]any, error) {
-	value, err := Get(appID, keypath)
+func GetMap(appID, key string) (map[string]any, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return nil, err
 	}
 
 	mapValue, ok := value.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("type mismatch: %s [%s] - expected map[string]any, got %T", keypath, appID, value)
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected map[string]any, got %T", key, appID, value)
+	}
+
+	return mapValue, nil
+}
+
+// GetMapQ retrieves a map[string]any preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not a map[string]any.
+func GetMapQ(appID, key, query string) (map[string]any, error) {
+	value, err := GetQ(appID, key, query)
+	if err != nil {
+		return nil, err
+	}
+
+	mapValue, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected map[string]any, got %T", key, appID, value)
 	}
 
 	return mapValue, nil
@@ -159,15 +289,31 @@ func GetMap(appID, keypath string) (map[string]any, error) {
 
 // GetData retrieves a []byte preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a []byte.
-func GetData(appID, keypath string) ([]byte, error) {
-	value, err := Get(appID, keypath)
+func GetData(appID, key string) ([]byte, error) {
+	value, err := Get(appID, key)
 	if err != nil {
 		return nil, err
 	}
 
 	dataValue, ok := value.([]byte)
 	if !ok {
-		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []byte, got %T", keypath, appID, value)
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []byte, got %T", key, appID, value)
+	}
+
+	return dataValue, nil
+}
+
+// GetDataQ retrieves a []byte preference value for the given JSONPath query using an application ID and root key.
+// Returns an error if the query is invalid or if the value is not a []byte.
+func GetDataQ(appID, key, query string) ([]byte, error) {
+	value, err := GetQ(appID, key, query)
+	if err != nil {
+		return nil, err
+	}
+
+	dataValue, ok := value.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: %s [%s] - expected []byte, got %T", key, appID, value)
 	}
 
 	return dataValue, nil
