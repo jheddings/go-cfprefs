@@ -1,8 +1,6 @@
 package cfprefs
 
 import (
-	"fmt"
-
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
@@ -28,8 +26,7 @@ func Delete(appID, keypath string) error {
 	// verify root is a dictionary
 	rootDict, ok := rootValue.(map[string]any)
 	if !ok {
-		return fmt.Errorf("keypath error: %s [%s] - segment '%s' is not a dictionary (type: %T)",
-			keypath, appID, segments[0], rootValue)
+		return KeyPathError(appID, keypath).WithMsgF("root is not a dictionary")
 	}
 
 	// traverse to the parent of the final key
@@ -46,8 +43,7 @@ func Delete(appID, keypath string) error {
 
 		nextDict, ok := value.(map[string]any)
 		if !ok {
-			return fmt.Errorf("keypath error: %s [%s] - segment '%s' is not a dictionary (type: %T)",
-				keypath, appID, segment, value)
+			return KeyPathError(appID, keypath).WithMsgF("segment '%s' is not a dictionary", segment)
 		}
 		currentDict = nextDict
 	}
