@@ -64,11 +64,12 @@ type KeyPathErr struct {
 	AppID string
 	Key   string
 	Msg   string
+	Err   error
 }
 
 // NewKeyPathError creates a new KeyPathErr
 func NewKeyPathError(appID, key string) *KeyPathErr {
-	return &KeyPathErr{AppID: appID, Key: key}
+	return &KeyPathErr{AppID: appID, Key: key, Err: ErrInvalidKeyPath}
 }
 
 // WithMsg adds a custom message to the error
@@ -85,15 +86,26 @@ func (e *KeyPathErr) WithMsgF(format string, a ...any) *KeyPathErr {
 
 // Error returns the error message
 func (e *KeyPathErr) Error() string {
-	if e.Msg == "" {
-		return fmt.Sprintf("key path error: %s [%s]", e.Key, e.AppID)
+	var msg string
+	if e.Msg != "" {
+		msg = e.Msg
+	} else if e.Err != nil {
+		msg = e.Err.Error()
+	} else {
+		msg = "key path error"
 	}
-	return fmt.Sprintf("key path error: %s [%s] - %s", e.Key, e.AppID, e.Msg)
+	return fmt.Sprintf("%s: %s [%s]", msg, e.Key, e.AppID)
 }
 
 // Is implements support for errors.Is
 func (e *KeyPathErr) Is(target error) bool {
 	return target == ErrInvalidKeyPath
+}
+
+// Wrap wraps an error with the KeyPathErr
+func (e *KeyPathErr) Wrap(err error) *KeyPathErr {
+	e.Err = errors.Join(e.Err, err)
+	return e
 }
 
 // Unwrap returns the underlying error

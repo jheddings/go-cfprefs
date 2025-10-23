@@ -39,195 +39,213 @@ func TestDeleteBasic(t *testing.T) {
 	assertKeyExists(t, appID, key, false)
 }
 
-func TestDeleteKeypath(t *testing.T) {
+func TestDeleteQ(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Create a nested structure with multiple keys
-	err := Set(appID, "delete-test/level1/value1", "first value")
-	testutil.AssertNoError(t, err, "set first value")
+	// Create a nested structure
+	nestedData := map[string]any{
+		"level1": map[string]any{
+			"value1": "first value",
+			"value2": "second value",
+		},
+		"level2": map[string]any{
+			"nested": int64(42),
+		},
+	}
 
-	err = Set(appID, "delete-test/level1/value2", "second value")
-	testutil.AssertNoError(t, err, "set second value")
-
-	err = Set(appID, "delete-test/level2/nested", int64(42))
-	testutil.AssertNoError(t, err, "set nested value")
-	defer Delete(appID, "delete-test")
+	testKey := "deleteq-test"
+	cleanup := setupTest(t, appID, testKey, nestedData)
+	defer cleanup()
 
 	// Verify all values exist
-	assertKeyExists(t, appID, "delete-test/level1/value1", true)
-	assertKeyExists(t, appID, "delete-test/level1/value2", true)
+	exists, _ := ExistsQ(appID, testKey, "$.level1.value1")
+	if !exists {
+		t.Fatal("value1 should exist before deletion")
+	}
 
 	// Delete one nested value
-	err = Delete(appID, "delete-test/level1/value1")
-	testutil.AssertNoError(t, err, "delete nested key")
+	err := DeleteQ(appID, testKey, "$.level1.value1")
+	testutil.AssertNoError(t, err, "delete nested field")
 
 	// Verify it was deleted
-	assertKeyExists(t, appID, "delete-test/level1/value1", false)
+	exists, _ = ExistsQ(appID, testKey, "$.level1.value1")
+	if exists {
+		t.Fatal("value1 should not exist after deletion")
+	}
 
 	// Verify sibling value still exists
-	assertKeyExists(t, appID, "delete-test/level1/value2", true)
-
-	value, err := Get(appID, "delete-test/level1/value2")
+	value, err := GetQ(appID, testKey, "$.level1.value2")
 	testutil.AssertNoError(t, err, "get sibling value")
 	if value.(string) != "second value" {
 		t.Fatalf("sibling value was modified: expected 'second value', got '%s'", value.(string))
 	}
 
 	// Verify parent dictionary still exists
-	assertKeyExists(t, appID, "delete-test/level1", true)
+	exists, _ = ExistsQ(appID, testKey, "$.level1")
+	if !exists {
+		t.Fatal("parent level1 should still exist")
+	}
 
 	// Verify other branch still exists
-	assertKeyExists(t, appID, "delete-test/level2/nested", true)
+	value, err = GetQ(appID, testKey, "$.level2.nested")
+	testutil.AssertNoError(t, err, "get other branch value")
+	if value.(int64) != int64(42) {
+		t.Fatalf("other branch was modified: expected 42, got %v", value)
+	}
 }
-
-func TestExists(t *testing.T) {
+func TestDeleteQArrayElement(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// if this fails, we need to manually cleanup
-	assertKeyExists(t, appID, "exists-test", false)
+	// Create a structure with an array
+	arrayData := map[string]any{
+		"items": []any{
+			map[string]any{"id": int64(1), "name": "first"},
+			map[string]any{"id": int64(2), "name": "second"},
+			map[string]any{"id": int64(3), "name": "third"},
+		},
+	}
 
-	cleanup := setupTest(t, appID, "exists-test", "test value")
+	testKey := "deleteq-array-test"
+	cleanup := setupTest(t, appID, testKey, arrayData)
 	defer cleanup()
 
-	assertKeyExists(t, appID, "exists-test", true)
-	assertKeyExists(t, appID, "nonexistent-key", false)
+	// Verify array has 3 items
+	items, err := GetSliceQ(appID, testKey, "$.items")
+	testutil.AssertNoError(t, err, "get items array")
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
+	}
+
+	// Delete the second item (index 1)
+	err = DeleteQ(appID, testKey, "$.items[1]")
+	testutil.AssertNoError(t, err, "delete array element")
+
+	// Verify array now has 2 items
+	items, err = GetSliceQ(appID, testKey, "$.items")
+	testutil.AssertNoError(t, err, "get items array after deletion")
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items after deletion, got %d", len(items))
+	}
+
+	// Verify the remaining items are correct
+	firstItem := items[0].(map[string]any)
+	if firstItem["id"].(int64) != int64(1) {
+		t.Fatalf("first item should have id 1, got %v", firstItem["id"])
+	}
+
+	secondItem := items[1].(map[string]any)
+	if secondItem["id"].(int64) != int64(3) {
+		t.Fatalf("second item should have id 3 (was third), got %v", secondItem["id"])
+	}
 }
 
-func TestExistsQ(t *testing.T) {
+func TestDeleteQNestedInArray(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	// Create a structure with nested data in an array
+	arrayData := map[string]any{
+		"items": []any{
+			map[string]any{"id": int64(1), "name": "first"},
+			map[string]any{"id": int64(2), "name": "second"},
+		},
+	}
+
+	testKey := "deleteq-nested-array-test"
+	cleanup := setupTest(t, appID, testKey, arrayData)
+	defer cleanup()
+
+	// Delete a field from an array element
+	err := DeleteQ(appID, testKey, "$.items[0].name")
+	testutil.AssertNoError(t, err, "delete field from array element")
+
+	// Verify the name field was deleted
+	exists, _ := ExistsQ(appID, testKey, "$.items[0].name")
+	if exists {
+		t.Fatal("items[0].name should not exist after deletion")
+	}
+
+	// Verify the id field still exists
+	value, err := GetIntQ(appID, testKey, "$.items[0].id")
+	testutil.AssertNoError(t, err, "get items[0].id")
+	if value != int64(1) {
+		t.Fatalf("items[0].id should be 1, got %v", value)
+	}
+
+	// Verify the second item is unchanged
+	value2, err := GetQ(appID, testKey, "$.items[1].name")
+	testutil.AssertNoError(t, err, "get items[1].name")
+	if value2.(string) != "second" {
+		t.Fatalf("items[1].name should be 'second', got %v", value2)
+	}
+}
+
+func TestDeleteQRootKey(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	testKey := "deleteq-root-test"
+	cleanup := setupTest(t, appID, testKey, "test value")
+	defer cleanup()
+
+	// Verify key exists
+	assertKeyExists(t, appID, testKey, true)
+
+	// Delete using empty query (deletes entire root key)
+	err := DeleteQ(appID, testKey, "")
+	testutil.AssertNoError(t, err, "delete with empty query")
+
+	// Verify key was deleted
+	assertKeyExists(t, appID, testKey, false)
+}
+
+func TestDeleteQWithDollarRoot(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	testKey := "deleteq-dollar-test"
+	cleanup := setupTest(t, appID, testKey, map[string]any{"field": "value"})
+	defer cleanup()
+
+	// Verify key exists
+	assertKeyExists(t, appID, testKey, true)
+
+	// Delete using "$" query (deletes entire root key)
+	err := DeleteQ(appID, testKey, "$")
+	testutil.AssertNoError(t, err, "delete with $ query")
+
+	// Verify key was deleted
+	assertKeyExists(t, appID, testKey, false)
+}
+
+func TestDeleteQNonExistentPath(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	nestedData := map[string]any{
 		"user": map[string]any{
-			"name": "John Doe",
-			"age":  int64(30),
-			"address": map[string]any{
-				"city":  "Anytown",
-				"state": "CA",
-			},
-		},
-		"items": []any{
-			map[string]any{"id": int64(1), "active": true},
-			map[string]any{"id": int64(2), "active": false},
-			map[string]any{"id": int64(3), "active": true},
+			"name": "John",
 		},
 	}
 
-	testKey := "existsq-test"
+	testKey := "deleteq-nonexistent-test"
 	cleanup := setupTest(t, appID, testKey, nestedData)
 	defer cleanup()
 
-	t.Run("Root object exists", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$")
-		testutil.AssertNoError(t, err, "check root exists")
-		if !exists {
-			t.Fatal("expected root to exist")
-		}
-	})
+	// Delete a non-existent path should be idempotent (no error)
+	err := DeleteQ(appID, testKey, "$.user.age")
+	testutil.AssertNoError(t, err, "delete non-existent path should be idempotent")
 
-	t.Run("Empty query checks root", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "")
-		testutil.AssertNoError(t, err, "check empty query")
-		if !exists {
-			t.Fatal("expected root to exist with empty query")
-		}
-	})
-
-	t.Run("Nested field exists", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$.user.name")
-		testutil.AssertNoError(t, err, "check user.name exists")
-		if !exists {
-			t.Fatal("expected user.name to exist")
-		}
-	})
-
-	t.Run("Deeply nested field exists", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$.user.address.city")
-		testutil.AssertNoError(t, err, "check user.address.city exists")
-		if !exists {
-			t.Fatal("expected user.address.city to exist")
-		}
-	})
-
-	t.Run("Array element exists", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$.items[0]")
-		testutil.AssertNoError(t, err, "check items[0] exists")
-		if !exists {
-			t.Fatal("expected items[0] to exist")
-		}
-	})
-
-	t.Run("Array field exists", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$.items[1].id")
-		testutil.AssertNoError(t, err, "check items[1].id exists")
-		if !exists {
-			t.Fatal("expected items[1].id to exist")
-		}
-	})
-
-	t.Run("Non-existent field returns false", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$.user.nonexistent")
-		testutil.AssertNoError(t, err, "check non-existent field")
-		if exists {
-			t.Fatal("expected user.nonexistent to not exist")
-		}
-	})
-
-	t.Run("Non-existent nested path returns false", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$.user.address.country")
-		testutil.AssertNoError(t, err, "check non-existent nested path")
-		if exists {
-			t.Fatal("expected user.address.country to not exist")
-		}
-	})
-
-	t.Run("Out of bounds array index returns false", func(t *testing.T) {
-		exists, err := ExistsQ(appID, testKey, "$.items[999]")
-		testutil.AssertNoError(t, err, "check out of bounds index")
-		if exists {
-			t.Fatal("expected items[999] to not exist")
-		}
-	})
-
-	t.Run("Non-existent root key returns false", func(t *testing.T) {
-		exists, err := ExistsQ(appID, "nonexistent-root", "$.user.name")
-		testutil.AssertNoError(t, err, "check non-existent root key")
-		if exists {
-			t.Fatal("expected non-existent root key to return false")
-		}
-	})
-
-	t.Run("Invalid JSONPath returns error", func(t *testing.T) {
-		_, err := ExistsQ(appID, testKey, "$.user[invalid")
-		testutil.AssertError(t, err, "invalid JSONPath should not error")
-	})
+	// Verify the existing data is unchanged
+	value, err := GetStrQ(appID, testKey, "$.user.name")
+	testutil.AssertNoError(t, err, "get existing field")
+	if value != "John" {
+		t.Fatalf("existing field should be unchanged, got %v", value)
+	}
 }
 
-func TestDeleteEmptyKeypath(t *testing.T) {
+func TestDeleteQNonExistentRootKey(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Test deleting with empty keypath
-	err := Delete(appID, "")
-	testutil.AssertError(t, err, "empty keypath")
-}
-
-func TestDeleteKeypathOnlySlashes(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Test keypath with only slashes
-	err := Delete(appID, "///")
-	testutil.AssertError(t, err, "keypath with only slashes")
-}
-
-func TestDeleteKeypathNonDictSegment(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Set a simple string value
-	cleanup := setupTest(t, appID, "simple-string", "hello")
-	defer cleanup()
-
-	// Try to delete through a non-dict segment - should return error
-	err := Delete(appID, "simple-string/nested")
-	testutil.AssertError(t, err, "deleting through non-dict segment")
+	// Delete from a non-existent root key should be idempotent (no error)
+	err := DeleteQ(appID, "nonexistent-root-key", "$.field")
+	testutil.AssertNoError(t, err, "delete from non-existent root should be idempotent")
 }
 
 func TestDeleteMissingKey(t *testing.T) {

@@ -1,96 +1,133 @@
 package cfprefs
 
 import (
-	"github.com/PaesslerAG/jsonpath"
+	"fmt"
+
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
-// Removes a preference value for the given keypath and application ID.
-// Returns an error if any intermediate segment exists but is not a dictionary.
-func Delete(appID, keypath string) error {
-	segments, err := splitKeypath(keypath)
-	if err != nil {
-		return err
-	}
-
-	// if there's only one segment, delete directly
-	if len(segments) == 1 {
-		return internal.Delete(appID, keypath)
-	}
-
-	rootValue, err := internal.Get(appID, segments[0])
-	if err != nil {
-		// root doesn't exist, nothing to delete
-		return nil
-	}
-
-	// verify root is a dictionary
-	rootDict, ok := rootValue.(map[string]any)
-	if !ok {
-		return NewKeyPathError(appID, keypath).WithMsgF("root is not a dictionary")
-	}
-
-	// traverse to the parent of the final key
-	currentDict := rootDict
-	for i := 1; i < len(segments)-1; i++ {
-		segment := segments[i]
-
-		// get the next dictionary
-		value, exists := currentDict[segment]
-		if !exists {
-			// path doesn't exist, nothing to delete
-			return nil
-		}
-
-		nextDict, ok := value.(map[string]any)
-		if !ok {
-			return NewKeyPathError(appID, keypath).WithMsgF("segment '%s' is not a dictionary", segment)
-		}
-		currentDict = nextDict
-	}
-
-	// delete the final key from the parent dictionary
-	finalKey := segments[len(segments)-1]
-	delete(currentDict, finalKey)
-
-	// write the modified root dictionary back
-	return internal.Set(appID, segments[0], rootDict)
+// Delete removes a preference value for the given key and application ID.
+// This deletes the entire key from the preferences.
+func Delete(appID, key string) error {
+	return internal.Delete(appID, key)
 }
 
-// Exists checks if a preference key exists for the given application ID.
-// Returns true if the key exists, false otherwise.
-func Exists(appID, key string) (bool, error) {
-	return internal.Exists(appID, key)
-}
-
-// ExistsQ checks if a value exists using JSONPath syntax within a specific root key.
+// DeleteQ removes a value using JSONPath syntax within a specific root key.
 // The JSONPath query is applied to the value stored under the rootKey.
-// Returns true if the query resolves to a valid value, false otherwise.
+// Currently supports simple queries that resolve to a single item.
 //
 // Example usage:
 //
-//	// Check if a nested value exists: $.user.name
-//	exists, err := ExistsQ("com.example.app", "userData", "$.user.name")
+//	// Delete a nested field: $.user.name
+//	err := DeleteQ("com.example.app", "userData", "$.user.name")
 //
-//	// Check if an array has items: $.items[0]
-//	exists, err := ExistsQ("com.example.app", "data", "$.items[0]")
+//	// Delete an array element: $.items[0]
+//	err := DeleteQ("com.example.app", "data", "$.items[0]")
 //
-//	// Check if filtered array has results: $.items[?(@.active == true)]
-//	exists, err := ExistsQ("com.example.app", "data", "$.items[?(@.active == true)]")
-func ExistsQ(appID, rootKey, query string) (bool, error) {
+//	// Delete the entire root (empty query or "$")
+//	err := DeleteQ("com.example.app", "data", "$")
+func DeleteQ(appID, rootKey, query string) error {
 	rootValue, err := internal.Get(appID, rootKey)
 	if err != nil {
-		return false, nil
+		return nil
 	}
 
+	// if the query is empty or "$", delete the entire root key
 	if query == "" || query == "$" {
-		return true, nil
+		return internal.Delete(appID, rootKey)
 	}
 
-	result, err := jsonpath.Get(query, rootValue)
+	// verify the path exists before attempting to delete
+	exists, err := ExistsQ(appID, rootKey, query)
 	if err != nil {
-		return false, NewKeyPathError(appID, rootKey).WithMsgF("JSONPath query failed for path '%s'", query)
+		return NewKeyPathError(appID, rootKey).Wrap(err).WithMsg("JSONPath query failed")
+	}
+	if !exists {
+		return nil
 	}
 
-	return result != nil, nil
+	// proceed to delete the specified path
+	modified, err := deleteAtPath(rootValue, query)
+	if err != nil {
+		return NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("failed to delete at path '%s'", query)
+	}
+
+	// write the modified root dictionary back
+	return internal.Set(appID, rootKey, modified)
+}
+
+// deleteAtPath removes a value at the given JSONPath from the data structure.
+// Returns the modified structure or an error if the path cannot be deleted.
+func deleteAtPath(data any, path string) (any, error) {
+	segments, err := parseJSONPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// if no segments (shouldn't happen after validation), return as-is
+	if len(segments) == 0 {
+		return data, nil
+	}
+
+	return deleteSegments(data, segments)
+}
+
+// deleteSegments navigates to the target and deletes it.
+func deleteSegments(data any, segments []pathSegment) (any, error) {
+	if len(segments) == 0 {
+		return data, nil
+	}
+
+	segment := segments[0]
+	isLast := len(segments) == 1
+
+	if segment.isArrayIdx {
+		// if the segment is an array index, delete the element at the index
+		arr, ok := data.([]any)
+		if !ok {
+			return nil, fmt.Errorf("expected array but got %T", data)
+		}
+
+		if segment.index < 0 || segment.index >= len(arr) {
+			return nil, fmt.Errorf("array index out of bounds: %d", segment.index)
+		}
+
+		if isLast {
+			// if this is the last segment, delete the element at the index
+			return append(arr[:segment.index], arr[segment.index+1:]...), nil
+		}
+
+		// delete the element at the index and return the modified array
+		modified, err := deleteSegments(arr[segment.index], segments[1:])
+		if err != nil {
+			return nil, err
+		}
+		arr[segment.index] = modified
+		return arr, nil
+	} else {
+		// if the segment is a field, delete the field
+		obj, ok := data.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("expected object but got %T", data)
+		}
+
+		if isLast {
+			// if this is the last segment, delete the field
+			delete(obj, segment.field)
+			return obj, nil
+		}
+
+		// delete the field and return the modified object
+		child, exists := obj[segment.field]
+		if !exists {
+			return nil, fmt.Errorf("field not found: %s", segment.field)
+		}
+
+		modified, err := deleteSegments(child, segments[1:])
+		if err != nil {
+			return nil, err
+		}
+		obj[segment.field] = modified
+		return obj, nil
+	}
 }
