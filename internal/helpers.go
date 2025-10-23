@@ -3,7 +3,6 @@ package internal
 // This file contains helper functions for common CGO operations.
 
 import (
-	"fmt"
 	"time"
 	"unsafe"
 )
@@ -36,10 +35,17 @@ func createCFStringRef(str string) (C.CFStringRef, error) {
 
 	strRef := C.createCFString(cStr)
 	if strRef == nilCFString {
-		return nilCFString, fmt.Errorf("failed to create CFString from: %s", str)
+		return nilCFString, CFMemoryError("failed to create CFString").WithMsgF("string: %s", str)
 	}
 
 	return strRef, nil
+}
+
+// safeCFRelease safely releases a CFTypeRef, checking for nil first.
+func safeCFRelease(ref C.CFTypeRef) {
+	if ref != nilCFType {
+		C.CFRelease(ref)
+	}
 }
 
 // calculateCFEpochOffset computes the offset between CF epoch and Unix epoch.
