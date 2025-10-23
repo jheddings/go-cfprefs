@@ -4,7 +4,6 @@ package internal
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 	"unsafe"
 )
@@ -20,16 +19,16 @@ Boolean getCFBoolean(CFBooleanRef boolRef) {
     return CFBooleanGetValue(boolRef);
 }
 
-int64_t getCFNumberAsInt64(CFNumberRef numRef) {
-    int64_t value = 0;
-    CFNumberGetValue(numRef, kCFNumberLongLongType, &value);
-    return value;
+// getCFNumberAsInt64WithCheck safely converts a CFNumber to int64_t with error checking
+Boolean getCFNumberAsInt64(CFNumberRef numRef, int64_t *outValue) {
+    if (numRef == NULL || outValue == NULL) return false;
+    return CFNumberGetValue(numRef, kCFNumberLongLongType, outValue);
 }
 
-double getCFNumberAsFloat64(CFNumberRef numRef) {
-    double value = 0;
-    CFNumberGetValue(numRef, kCFNumberDoubleType, &value);
-    return value;
+// getCFNumberAsFloat64WithCheck safely converts a CFNumber to double with error checking
+Boolean getCFNumberAsFloat64(CFNumberRef numRef, double *outValue) {
+    if (numRef == NULL || outValue == NULL) return false;
+    return CFNumberGetValue(numRef, kCFNumberDoubleType, outValue);
 }
 
 CFNumberType getCFNumberType(CFNumberRef numRef) {
@@ -44,28 +43,24 @@ Boolean isCFNumberFloat(CFNumberRef numRef) {
             type == kCFNumberFloat64Type);
 }
 
-int8_t getCFNumberAsInt8(CFNumberRef numRef) {
-    int8_t value = 0;
-    CFNumberGetValue(numRef, kCFNumberSInt8Type, &value);
-    return value;
+Boolean getCFNumberAsInt8(CFNumberRef numRef, int8_t *outValue) {
+    if (numRef == NULL || outValue == NULL) return false;
+    return CFNumberGetValue(numRef, kCFNumberSInt8Type, outValue);
 }
 
-int16_t getCFNumberAsInt16(CFNumberRef numRef) {
-    int16_t value = 0;
-    CFNumberGetValue(numRef, kCFNumberSInt16Type, &value);
-    return value;
+Boolean getCFNumberAsInt16(CFNumberRef numRef, int16_t *outValue) {
+    if (numRef == NULL || outValue == NULL) return false;
+    return CFNumberGetValue(numRef, kCFNumberSInt16Type, outValue);
 }
 
-int32_t getCFNumberAsInt32(CFNumberRef numRef) {
-    int32_t value = 0;
-    CFNumberGetValue(numRef, kCFNumberSInt32Type, &value);
-    return value;
+Boolean getCFNumberAsInt32(CFNumberRef numRef, int32_t *outValue) {
+    if (numRef == NULL || outValue == NULL) return false;
+    return CFNumberGetValue(numRef, kCFNumberSInt32Type, outValue);
 }
 
-float getCFNumberAsFloat32(CFNumberRef numRef) {
-    float value = 0;
-    CFNumberGetValue(numRef, kCFNumberFloat32Type, &value);
-    return value;
+Boolean getCFNumberAsFloat32(CFNumberRef numRef, float *outValue) {
+    if (numRef == NULL || outValue == NULL) return false;
+    return CFNumberGetValue(numRef, kCFNumberFloat32Type, outValue);
 }
 
 CFIndex getCFArrayCount(CFArrayRef arr) {
@@ -123,7 +118,7 @@ import "C"
 
 // converts a CFTypeRef to a native Go type
 func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
-	if unsafe.Pointer(cfValue) == nil {
+	if cfValue == nilCFType {
 		return nil, nil
 	}
 
@@ -150,10 +145,9 @@ func convertCFTypeToGo(cfValue C.CFTypeRef) (any, error) {
 
 	case C.CFDataGetTypeID():
 		return convertCFDataToGo(C.CFDataRef(cfValue)), nil
-
-	default:
-		return nil, fmt.Errorf("unsupported CFType: %v", typeID)
 	}
+
+	return nil, CFTypeError().WithMsgF("unsupported CFType: %v", typeID)
 }
 
 // converts a CFBooleanRef to a Go bool
@@ -165,7 +159,7 @@ func convertCFBooleanToGo(boolRef C.CFBooleanRef) bool {
 func convertCFStringToGo(strRef C.CFStringRef) (string, error) {
 	cStr := C.cfStringToC(strRef)
 	if cStr == nil {
-		return "", fmt.Errorf("failed to convert CFString")
+		return "", CFTypeError().WithMsg("failed to convert CFString")
 	}
 	defer C.free(unsafe.Pointer(cStr))
 	return C.GoString(cStr), nil
@@ -177,29 +171,49 @@ func convertCFNumberToGo(numRef C.CFNumberRef) (any, error) {
 
 	switch numberType {
 	case C.kCFNumberSInt8Type, C.kCFNumberCharType:
-		return int8(C.getCFNumberAsInt8(numRef)), nil
+		var value C.int8_t
+		if C.getCFNumberAsInt8(numRef, &value) == C.false {
+			return nil, CFTypeError().WithMsg("failed to convert CFNumber to int8")
+		}
+		return int8(value), nil
 
 	case C.kCFNumberSInt16Type, C.kCFNumberShortType:
-		return int16(C.getCFNumberAsInt16(numRef)), nil
+		var value C.int16_t
+		if C.getCFNumberAsInt16(numRef, &value) == C.false {
+			return nil, CFTypeError().WithMsg("failed to convert CFNumber to int16")
+		}
+		return int16(value), nil
 
 	case C.kCFNumberSInt32Type, C.kCFNumberIntType:
-		return int32(C.getCFNumberAsInt32(numRef)), nil
+		var value C.int32_t
+		if C.getCFNumberAsInt32(numRef, &value) == C.false {
+			return nil, CFTypeError().WithMsg("failed to convert CFNumber to int32")
+		}
+		return int32(value), nil
 
 	case C.kCFNumberSInt64Type, C.kCFNumberLongLongType:
-		return int64(C.getCFNumberAsInt64(numRef)), nil
+		var value C.int64_t
+		if C.getCFNumberAsInt64(numRef, &value) == C.false {
+			return nil, CFTypeError().WithMsg("failed to convert CFNumber to int64")
+		}
+		return int64(value), nil
 
 	case C.kCFNumberFloat32Type, C.kCFNumberFloatType:
-		return float32(C.getCFNumberAsFloat32(numRef)), nil
+		var value C.float
+		if C.getCFNumberAsFloat32(numRef, &value) == C.false {
+			return nil, CFTypeError().WithMsg("failed to convert CFNumber to float32")
+		}
+		return float32(value), nil
 
 	case C.kCFNumberFloat64Type, C.kCFNumberDoubleType, C.kCFNumberCGFloatType:
-		return float64(C.getCFNumberAsFloat64(numRef)), nil
-
-	default:
-		if C.isCFNumberFloat(numRef) != 0 {
-			return float64(C.getCFNumberAsFloat64(numRef)), nil
+		var value C.double
+		if C.getCFNumberAsFloat64(numRef, &value) == C.false {
+			return nil, CFTypeError().WithMsg("failed to convert CFNumber to float64")
 		}
-		return int64(C.getCFNumberAsInt64(numRef)), nil
+		return float64(value), nil
 	}
+
+	return nil, CFTypeError().WithMsgF("unsupported CFNumber type: %v", numberType)
 }
 
 // converts a CFDateRef to a Go time.Time
@@ -224,7 +238,7 @@ func convertCFDataToGo(dataRef C.CFDataRef) any {
 	data := C.GoBytes(unsafe.Pointer(bytes), C.int(length))
 
 	// first, try to deserialize as property list
-	if plist := C.tryDeserializePlist(dataRef); unsafe.Pointer(plist) != nil {
+	if plist := C.tryDeserializePlist(dataRef); plist != nilCFType {
 		defer C.CFRelease(C.CFTypeRef(plist))
 		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
 			return value
@@ -250,7 +264,7 @@ func convertCFArrayToGo(arrRef C.CFArrayRef) ([]any, error) {
 		cfValue := C.getCFArrayValueAtIndex(arrRef, C.CFIndex(i))
 		value, err := convertCFTypeToGo(cfValue)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+			return nil, CFTypeError().Wrap(err).WithMsgF("failed to convert array element %d", i)
 		}
 		result[i] = value
 	}
@@ -267,7 +281,7 @@ func convertCFArrayToGoStr(arrRef C.CFArrayRef) ([]string, error) {
 		cfValue := C.getCFArrayValueAtIndex(arrRef, C.CFIndex(i))
 		value, err := convertCFStringToGo(C.CFStringRef(cfValue))
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+			return nil, CFTypeError().Wrap(err).WithMsgF("failed to convert array element %d", i)
 		}
 		result[i] = value
 	}
@@ -290,13 +304,13 @@ func convertCFDictionaryToGo(dictRef C.CFDictionaryRef) (map[string]any, error) 
 		keyRef := C.CFStringRef(keys[i])
 		keyStr, err := convertCFStringToGo(keyRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert dictionary key: %w", err)
+			return nil, CFTypeError().Wrap(err).WithMsg("failed to convert dictionary key to string")
 		}
 
 		valueRef := C.getCFDictionaryValue(dictRef, keyRef)
 		value, err := convertCFTypeToGo(valueRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert dictionary value for key '%s': %w", keyStr, err)
+			return nil, CFTypeError().Wrap(err).WithMsgF("failed to convert dictionary value for key '%s'", keyStr)
 		}
 
 		result[keyStr] = value

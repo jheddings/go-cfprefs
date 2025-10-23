@@ -3,7 +3,6 @@ package internal
 // This file contains helper functions for common CGO operations.
 
 import (
-	"fmt"
 	"time"
 	"unsafe"
 )
@@ -16,6 +15,11 @@ import (
 extern CFStringRef createCFString(const char *str);
 */
 import "C"
+
+// nil CF types used to represent null values in the CGO API.
+var nilCFType = C.CFTypeRef(unsafe.Pointer(nil))
+var nilCFString = C.CFStringRef(unsafe.Pointer(nil))
+var nilCFArray = C.CFArrayRef(unsafe.Pointer(nil))
 
 // CFAbsoluteTimeIntervalSince1970 is the offset between CoreFoundation's epoch
 // (Jan 1, 2001 00:00:00 GMT) and Unix epoch (Jan 1, 1970 00:00:00 GMT).
@@ -30,11 +34,18 @@ func createCFStringRef(str string) (C.CFStringRef, error) {
 	defer C.free(unsafe.Pointer(cStr))
 
 	strRef := C.createCFString(cStr)
-	if strRef == C.CFStringRef(unsafe.Pointer(nil)) {
-		return C.CFStringRef(unsafe.Pointer(nil)), fmt.Errorf("failed to create CFString from: %s", str)
+	if strRef == nilCFString {
+		return nilCFString, CFMemoryError("failed to create CFString").WithMsgF("string: %s", str)
 	}
 
 	return strRef, nil
+}
+
+// safeCFRelease safely releases a CFTypeRef, checking for nil first.
+func safeCFRelease(ref C.CFTypeRef) {
+	if ref != nilCFType {
+		C.CFRelease(ref)
+	}
 }
 
 // calculateCFEpochOffset computes the offset between CF epoch and Unix epoch.
