@@ -1,6 +1,7 @@
 package cfprefs
 
 import (
+	"github.com/PaesslerAG/jsonpath"
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
@@ -56,48 +57,40 @@ func Delete(appID, keypath string) error {
 	return internal.Set(appID, segments[0], rootDict)
 }
 
-// Checks if a preference key exists for the given application ID.
-// Returns true if the full path exists, false otherwise.
-func Exists(appID, keypath string) (bool, error) {
-	segments, err := splitKeypath(keypath)
-	if err != nil {
-		return false, err
-	}
+// Exists checks if a preference key exists for the given application ID.
+// Returns true if the key exists, false otherwise.
+func Exists(appID, key string) (bool, error) {
+	return internal.Exists(appID, key)
+}
 
-	// check if the root key exists
-	exists, err := internal.Exists(appID, segments[0])
+// ExistsQ checks if a value exists using JSONPath syntax within a specific root key.
+// The JSONPath query is applied to the value stored under the rootKey.
+// Returns true if the query resolves to a valid value, false otherwise.
+//
+// Example usage:
+//
+//	// Check if a nested value exists: $.user.name
+//	exists, err := ExistsQ("com.example.app", "userData", "$.user.name")
+//
+//	// Check if an array has items: $.items[0]
+//	exists, err := ExistsQ("com.example.app", "data", "$.items[0]")
+//
+//	// Check if filtered array has results: $.items[?(@.active == true)]
+//	exists, err := ExistsQ("com.example.app", "data", "$.items[?(@.active == true)]")
+func ExistsQ(appID, rootKey, query string) (bool, error) {
+	rootValue, err := internal.Get(appID, rootKey)
 	if err != nil {
-		return false, err
-	}
-	if !exists {
 		return false, nil
 	}
 
-	// if there's only one segment, we're done
-	if len(segments) == 1 {
+	if query == "" || query == "$" {
 		return true, nil
 	}
 
-	// get the root value
-	value, err := internal.Get(appID, segments[0])
+	result, err := jsonpath.Get(query, rootValue)
 	if err != nil {
-		return false, nil
+		return false, NewKeyPathError(appID, rootKey).WithMsgF("JSONPath query failed for path '%s'", query)
 	}
 
-	// traverse the remaining path segments
-	for i := 1; i < len(segments); i++ {
-		dict, ok := value.(map[string]any)
-		if !ok {
-			// segment is not a dictionary, path doesn't exist
-			return false, nil
-		}
-
-		value, ok = dict[segments[i]]
-		if !ok {
-			// segment not found
-			return false, nil
-		}
-	}
-
-	return true, nil
+	return result != nil, nil
 }
