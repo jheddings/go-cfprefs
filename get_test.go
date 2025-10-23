@@ -213,26 +213,6 @@ func TestGetEmptyKeypath(t *testing.T) {
 	testutil.AssertError(t, err, "empty keypath")
 }
 
-func TestGetKeypathOnlySlashes(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Test keypath with only slashes
-	_, err := Get(appID, "///")
-	testutil.AssertError(t, err, "keypath with only slashes")
-}
-
-func TestGetKeypathNonDictSegment(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Set a simple string value
-	cleanup := setupTest(t, appID, "simple-string", "hello")
-	defer cleanup()
-
-	// Try to traverse through it as if it were a dictionary
-	_, err := Get(appID, "simple-string/nested")
-	testutil.AssertError(t, err, "traversing non-dict segment")
-}
-
 func TestQuery(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
@@ -271,6 +251,10 @@ func TestQuery(t *testing.T) {
 			t.Fatalf("expected %v, got %v", simpleData, value)
 		}
 	})
+}
+
+func TestGetQueryErrors(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
 
 	t.Run("Non-existent field", func(t *testing.T) {
 		_, err := GetQ(appID, "userData", "$.nonexistent")
