@@ -49,7 +49,7 @@ func Set(appID, keypath string, value any) error {
 			// segments must be dictionaries to traverse further
 			nextDict, ok := value.(map[string]any)
 			if !ok {
-				return KeyPathError(appID, keypath).WithMsgF("segment '%s' exists but is not a dictionary", segment)
+				return NewKeyPathError(appID, keypath).WithMsgF("segment '%s' exists but is not a dictionary", segment)
 			}
 			currentDict = nextDict
 		}

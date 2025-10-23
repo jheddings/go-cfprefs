@@ -26,7 +26,7 @@ func Delete(appID, keypath string) error {
 	// verify root is a dictionary
 	rootDict, ok := rootValue.(map[string]any)
 	if !ok {
-		return KeyPathError(appID, keypath).WithMsgF("root is not a dictionary")
+		return NewKeyPathError(appID, keypath).WithMsgF("root is not a dictionary")
 	}
 
 	// traverse to the parent of the final key
@@ -43,7 +43,7 @@ func Delete(appID, keypath string) error {
 
 		nextDict, ok := value.(map[string]any)
 		if !ok {
-			return KeyPathError(appID, keypath).WithMsgF("segment '%s' is not a dictionary", segment)
+			return NewKeyPathError(appID, keypath).WithMsgF("segment '%s' is not a dictionary", segment)
 		}
 		currentDict = nextDict
 	}
