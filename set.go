@@ -1,8 +1,6 @@
 package cfprefs
 
 import (
-	"fmt"
-
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
@@ -51,7 +49,7 @@ func Set(appID, keypath string, value any) error {
 			// segments must be dictionaries to traverse further
 			nextDict, ok := value.(map[string]any)
 			if !ok {
-				return fmt.Errorf("keypath error: %s [%s] - segment '%s' exists but is not a dictionary (type: %T)", keypath, appID, segment, value)
+				return NewKeyPathError(appID, keypath).WithMsgF("segment '%s' exists but is not a dictionary", segment)
 			}
 			currentDict = nextDict
 		}

@@ -2,10 +2,7 @@ package internal
 
 // This file contains the public API operations for CoreFoundation preferences.
 
-import (
-	"fmt"
-	"unsafe"
-)
+// File imports removed - using custom error types
 
 // TODO: fail gracefully if not running on macOS
 
@@ -23,26 +20,26 @@ import "C"
 func Get(appID, key string) (any, error) {
 	appIDRef, err := createCFStringRef(appID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CFString for appID: %w", err)
+		return nil, CFRefError().Wrap(err).WithMsg("failed to create CFString for appID")
 	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
 	keyRef, err := createCFStringRef(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CFString for key: %w", err)
+		return nil, CFRefError().Wrap(err).WithMsg("failed to create CFString for key")
 	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopyappvalue(_:_:)
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
-	if value == C.CFTypeRef(unsafe.Pointer(nil)) {
-		return nil, fmt.Errorf("key not found: %s [%s]", key, appID)
+	if value == nilCFType {
+		return nil, NewCFError("get preference", nil).WithMsgF("key not found: %s [%s]", key, appID)
 	}
 	defer C.CFRelease(value)
 
 	goValue, err := convertCFTypeToGo(value)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert preference value: %w", err)
+		return nil, CFTypeError().Wrap(err).WithMsg("failed to convert preference value")
 	}
 
 	return goValue, nil
@@ -52,20 +49,20 @@ func Get(appID, key string) (any, error) {
 func GetKeys(appID string) ([]string, error) {
 	appIDRef, err := createCFStringRef(appID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CFString for appID: %w", err)
+		return nil, CFRefError().Wrap(err).WithMsg("failed to create CFString for appID")
 	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopykeylist(_:_:_:)
 	keysCF := C.CFPreferencesCopyKeyList(appIDRef, C.kCFPreferencesCurrentUser, C.kCFPreferencesAnyHost)
-	if unsafe.Pointer(keysCF) == nil {
-		return nil, fmt.Errorf("app not found: %s", appID)
+	if keysCF == nilCFArray {
+		return nil, NewCFError("get keys", nil).WithMsgF("app not found: %s", appID)
 	}
 	defer C.CFRelease(C.CFTypeRef(keysCF))
 
 	keys, err := convertCFArrayToGoStr(keysCF)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert keys array: %w", err)
+		return nil, CFTypeError().Wrap(err).WithMsg("failed to convert keys array")
 	}
 
 	return keys, nil
@@ -75,24 +72,22 @@ func GetKeys(appID string) ([]string, error) {
 func Set(appID, key string, value any) error {
 	appIDRef, err := createCFStringRef(appID)
 	if err != nil {
-		return fmt.Errorf("failed to create CFString for appID: %w", err)
+		return CFRefError().Wrap(err).WithMsg("failed to create CFString for appID")
 	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
 	keyRef, err := createCFStringRef(key)
 	if err != nil {
-		return fmt.Errorf("failed to create CFString for key: %w", err)
+		return CFRefError().Wrap(err).WithMsg("failed to create CFString for key")
 	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
 	valueRef, err := convertGoToCFType(value)
 	if err != nil {
-		return fmt.Errorf("failed to convert value: %w", err)
+		return CFTypeError().Wrap(err).WithMsg("failed to convert value")
 	}
 	defer func() {
-		if valueRef != C.CFTypeRef(unsafe.Pointer(nil)) {
-			C.CFRelease(valueRef)
-		}
+		safeCFRelease(valueRef)
 	}()
 
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencessetappvalue(_:_:_:)
@@ -101,7 +96,7 @@ func Set(appID, key string, value any) error {
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencesappsynchronize(_:)
 	success := C.CFPreferencesAppSynchronize(appIDRef)
 	if success == 0 {
-		return fmt.Errorf("failed to synchronize preferences")
+		return CFSyncError().WithMsg("failed to synchronize preferences")
 	}
 
 	return nil
@@ -111,22 +106,23 @@ func Set(appID, key string, value any) error {
 func Delete(appID, key string) error {
 	appIDRef, err := createCFStringRef(appID)
 	if err != nil {
-		return fmt.Errorf("failed to create CFString for appID: %w", err)
+		return CFRefError().Wrap(err).WithMsg("failed to create CFString for appID")
 	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
 	keyRef, err := createCFStringRef(key)
 	if err != nil {
-		return fmt.Errorf("failed to create CFString for key: %w", err)
+		return CFRefError().Wrap(err).WithMsg("failed to create CFString for key")
 	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
-	nilRef := C.CFTypeRef(unsafe.Pointer(nil))
-	C.CFPreferencesSetAppValue(keyRef, nilRef, appIDRef)
+	// https://developer.apple.com/documentation/corefoundation/cfpreferencessetappvalue(_:_:_:)
+	C.CFPreferencesSetAppValue(keyRef, nilCFType, appIDRef)
 
+	// https://developer.apple.com/documentation/corefoundation/cfpreferencesappsynchronize(_:)
 	success := C.CFPreferencesAppSynchronize(appIDRef)
 	if success == 0 {
-		return fmt.Errorf("failed to synchronize preferences")
+		return CFSyncError().WithMsg("failed to synchronize preferences")
 	}
 
 	return nil
@@ -136,18 +132,19 @@ func Delete(appID, key string) error {
 func Exists(appID, key string) (bool, error) {
 	appIDRef, err := createCFStringRef(appID)
 	if err != nil {
-		return false, fmt.Errorf("failed to create CFString for appID: %w", err)
+		return false, CFRefError().Wrap(err).WithMsg("failed to create CFString for appID")
 	}
 	defer C.CFRelease(C.CFTypeRef(appIDRef))
 
 	keyRef, err := createCFStringRef(key)
 	if err != nil {
-		return false, fmt.Errorf("failed to create CFString for key: %w", err)
+		return false, CFRefError().Wrap(err).WithMsg("failed to create CFString for key")
 	}
 	defer C.CFRelease(C.CFTypeRef(keyRef))
 
+	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopyappvalue(_:_:)
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
-	if value == C.CFTypeRef(unsafe.Pointer(nil)) {
+	if value == nilCFType {
 		return false, nil
 	}
 	defer C.CFRelease(value)
