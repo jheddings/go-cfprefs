@@ -1,6 +1,7 @@
 package cfprefs
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/jheddings/go-cfprefs/testutil"
@@ -42,7 +43,6 @@ func TestDeleteBasic(t *testing.T) {
 func TestDeleteQ(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Create a nested structure
 	nestedData := map[string]any{
 		"level1": map[string]any{
 			"value1": "first value",
@@ -57,46 +57,46 @@ func TestDeleteQ(t *testing.T) {
 	cleanup := setupTest(t, appID, testKey, nestedData)
 	defer cleanup()
 
-	// Verify all values exist
-	exists, _ := ExistsQ(appID, testKey, "$.level1.value1")
+	// basic check that the value exists (using bracket notation)
+	exists, _ := ExistsQ(appID, testKey, "$['level1']['value1']")
 	if !exists {
 		t.Fatal("value1 should exist before deletion")
 	}
 
-	// Delete one nested value
+	// delete one nested value
 	err := DeleteQ(appID, testKey, "$.level1.value1")
 	testutil.AssertNoError(t, err, "delete nested field")
 
-	// Verify it was deleted
+	// verify it was deleted (using dot notation)
 	exists, _ = ExistsQ(appID, testKey, "$.level1.value1")
 	if exists {
 		t.Fatal("value1 should not exist after deletion")
 	}
 
-	// Verify sibling value still exists
-	value, err := GetQ(appID, testKey, "$.level1.value2")
+	// verify sibling value still exists (using bracket notation)
+	value, err := GetQ(appID, testKey, "$['level1']['value2']")
 	testutil.AssertNoError(t, err, "get sibling value")
 	if value.(string) != "second value" {
 		t.Fatalf("sibling value was modified: expected 'second value', got '%s'", value.(string))
 	}
 
-	// Verify parent dictionary still exists
+	// verify parent dictionary still exists
 	exists, _ = ExistsQ(appID, testKey, "$.level1")
 	if !exists {
 		t.Fatal("parent level1 should still exist")
 	}
 
-	// Verify other branch still exists
+	// verify other branch still exists
 	value, err = GetQ(appID, testKey, "$.level2.nested")
 	testutil.AssertNoError(t, err, "get other branch value")
 	if value.(int64) != int64(42) {
 		t.Fatalf("other branch was modified: expected 42, got %v", value)
 	}
 }
+
 func TestDeleteQArrayElement(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Create a structure with an array
 	arrayData := map[string]any{
 		"items": []any{
 			map[string]any{"id": int64(1), "name": "first"},
@@ -109,40 +109,27 @@ func TestDeleteQArrayElement(t *testing.T) {
 	cleanup := setupTest(t, appID, testKey, arrayData)
 	defer cleanup()
 
-	// Verify array has 3 items
-	items, err := GetSliceQ(appID, testKey, "$.items")
-	testutil.AssertNoError(t, err, "get items array")
-	if len(items) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(items))
-	}
-
-	// Delete the second item (index 1)
-	err = DeleteQ(appID, testKey, "$.items[1]")
+	// delete the second item (index 1)
+	err := DeleteQ(appID, testKey, "$.items[1]")
 	testutil.AssertNoError(t, err, "delete array element")
 
-	// Verify array now has 2 items
-	items, err = GetSliceQ(appID, testKey, "$.items")
+	// verify the modified array
+	items, err := GetSliceQ(appID, testKey, "$.items")
 	testutil.AssertNoError(t, err, "get items array after deletion")
-	if len(items) != 2 {
-		t.Fatalf("expected 2 items after deletion, got %d", len(items))
+
+	expected := []any{
+		map[string]any{"id": int64(1), "name": "first"},
+		map[string]any{"id": int64(3), "name": "third"},
 	}
 
-	// Verify the remaining items are correct
-	firstItem := items[0].(map[string]any)
-	if firstItem["id"].(int64) != int64(1) {
-		t.Fatalf("first item should have id 1, got %v", firstItem["id"])
-	}
-
-	secondItem := items[1].(map[string]any)
-	if secondItem["id"].(int64) != int64(3) {
-		t.Fatalf("second item should have id 3 (was third), got %v", secondItem["id"])
+	if !reflect.DeepEqual(items, expected) {
+		t.Fatalf("items should be %v, got %v", expected, items)
 	}
 }
 
 func TestDeleteQNestedInArray(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Create a structure with nested data in an array
 	arrayData := map[string]any{
 		"items": []any{
 			map[string]any{"id": int64(1), "name": "first"},
@@ -154,28 +141,28 @@ func TestDeleteQNestedInArray(t *testing.T) {
 	cleanup := setupTest(t, appID, testKey, arrayData)
 	defer cleanup()
 
-	// Delete a field from an array element
-	err := DeleteQ(appID, testKey, "$.items[0].name")
+	// delete a field from an array element (using bracket notation)
+	err := DeleteQ(appID, testKey, "$['items'][0]['name']")
 	testutil.AssertNoError(t, err, "delete field from array element")
 
-	// Verify the name field was deleted
-	exists, _ := ExistsQ(appID, testKey, "$.items[0].name")
+	// verify the name field was deleted
+	exists, _ := ExistsQ(appID, testKey, "$['items'][0]['name']")
 	if exists {
 		t.Fatal("items[0].name should not exist after deletion")
 	}
 
-	// Verify the id field still exists
-	value, err := GetIntQ(appID, testKey, "$.items[0].id")
+	// verify the id field still exists
+	value, err := GetIntQ(appID, testKey, "$['items'][0]['id']")
 	testutil.AssertNoError(t, err, "get items[0].id")
 	if value != int64(1) {
 		t.Fatalf("items[0].id should be 1, got %v", value)
 	}
 
-	// Verify the second item is unchanged
-	value2, err := GetQ(appID, testKey, "$.items[1].name")
+	// verify the second item is unchanged
+	value2, err := GetStrQ(appID, testKey, "$['items'][1]['name']")
 	testutil.AssertNoError(t, err, "get items[1].name")
-	if value2.(string) != "second" {
-		t.Fatalf("items[1].name should be 'second', got %v", value2)
+	if value2 != "second" {
+		t.Fatalf("items[1].name should be 'second', got '%s'", value2)
 	}
 }
 
@@ -186,14 +173,12 @@ func TestDeleteQRootKey(t *testing.T) {
 	cleanup := setupTest(t, appID, testKey, "test value")
 	defer cleanup()
 
-	// Verify key exists
 	assertKeyExists(t, appID, testKey, true)
 
-	// Delete using empty query (deletes entire root key)
+	// delete using empty query (deletes entire root key)
 	err := DeleteQ(appID, testKey, "")
 	testutil.AssertNoError(t, err, "delete with empty query")
 
-	// Verify key was deleted
 	assertKeyExists(t, appID, testKey, false)
 }
 
@@ -204,14 +189,12 @@ func TestDeleteQWithDollarRoot(t *testing.T) {
 	cleanup := setupTest(t, appID, testKey, map[string]any{"field": "value"})
 	defer cleanup()
 
-	// Verify key exists
 	assertKeyExists(t, appID, testKey, true)
 
-	// Delete using "$" query (deletes entire root key)
+	// delete using "$" query (deletes entire root key)
 	err := DeleteQ(appID, testKey, "$")
 	testutil.AssertNoError(t, err, "delete with $ query")
 
-	// Verify key was deleted
 	assertKeyExists(t, appID, testKey, false)
 }
 
@@ -228,11 +211,10 @@ func TestDeleteQNonExistentPath(t *testing.T) {
 	cleanup := setupTest(t, appID, testKey, nestedData)
 	defer cleanup()
 
-	// Delete a non-existent path should be idempotent (no error)
+	// delete a non-existent path should be idempotent (no error)
 	err := DeleteQ(appID, testKey, "$.user.age")
 	testutil.AssertNoError(t, err, "delete non-existent path should be idempotent")
 
-	// Verify the existing data is unchanged
 	value, err := GetStrQ(appID, testKey, "$.user.name")
 	testutil.AssertNoError(t, err, "get existing field")
 	if value != "John" {
@@ -243,15 +225,134 @@ func TestDeleteQNonExistentPath(t *testing.T) {
 func TestDeleteQNonExistentRootKey(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Delete from a non-existent root key should be idempotent (no error)
-	err := DeleteQ(appID, "nonexistent-root-key", "$.field")
+	// delete from a non-existent root key should be idempotent (no error)
+	err := DeleteQ(appID, "nonexistent-root-key", "$['field']")
 	testutil.AssertNoError(t, err, "delete from non-existent root should be idempotent")
 }
 
 func TestDeleteMissingKey(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Deleting a non-existent key should not error (idempotent)
-	err := Delete(appID, "this-key-does-not-exist")
+	// deleting a non-existent key should not error (idempotent)
+	err := Delete(appID, "delete-missing-key")
 	testutil.AssertNoError(t, err, "delete missing key should be idempotent")
+}
+
+func TestDeleteMultipleValues(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	data := map[string]any{
+		"users": []any{
+			map[string]any{"id": int64(1), "name": "Alice", "active": true},
+			map[string]any{"id": int64(2), "name": "Bob", "active": false},
+			map[string]any{"id": int64(3), "name": "Charlie", "active": true},
+		},
+	}
+
+	testKey := "deleteq-multiple-test"
+	cleanup := setupTest(t, appID, testKey, data)
+	defer cleanup()
+
+	// delete all 'active' fields from users
+	err := DeleteQ(appID, testKey, "$.users[*].active")
+	testutil.AssertNoError(t, err, "delete multiple fields")
+
+	users, err := GetSliceQ(appID, testKey, "$.users")
+	testutil.AssertNoError(t, err, "get users")
+
+	expected := []any{
+		map[string]any{"id": int64(1), "name": "Alice"},
+		map[string]any{"id": int64(2), "name": "Bob"},
+		map[string]any{"id": int64(3), "name": "Charlie"},
+	}
+
+	if !reflect.DeepEqual(users, expected) {
+		t.Fatalf("users should be %v, got %v", expected, users)
+	}
+}
+
+func TestDeleteMultipleArrayElements(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	data := map[string]any{
+		"data": map[string]any{
+			"items": []any{
+				map[string]any{"type": "A", "value": int64(1)},
+				map[string]any{"type": "B", "value": int64(2)},
+				map[string]any{"type": "A", "value": int64(3)},
+				map[string]any{"type": "C", "value": int64(4)},
+			},
+		},
+	}
+
+	testKey := "deleteq-multiple-array-test"
+	cleanup := setupTest(t, appID, testKey, data)
+	defer cleanup()
+
+	// delete all items with type "A" using a filter
+	err := DeleteQ(appID, testKey, "$.data.items[?(@.type=='A')]")
+	if err != nil {
+		t.Fatalf("failed to delete items with type A: %v", err)
+	}
+
+	// verify remaining items
+	items, err := GetSliceQ(appID, testKey, "$.data.items")
+	testutil.AssertNoError(t, err, "get remaining items")
+
+	expected := []any{
+		map[string]any{"type": "B", "value": int64(2)},
+		map[string]any{"type": "C", "value": int64(4)},
+	}
+
+	if !reflect.DeepEqual(items, expected) {
+		t.Fatalf("items should be %v, got %v", expected, items)
+	}
+}
+
+func TestDeleteWildcardPaths(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	data := map[string]any{
+		"departments": map[string]any{
+			"sales": map[string]any{
+				"budget":    int64(100000),
+				"employees": int64(10),
+			},
+			"marketing": map[string]any{
+				"budget":    int64(50000),
+				"employees": int64(5),
+			},
+			"engineering": map[string]any{
+				"budget":    int64(200000),
+				"employees": int64(20),
+			},
+		},
+	}
+
+	testKey := "deleteq-wildcard-test"
+	cleanup := setupTest(t, appID, testKey, data)
+	defer cleanup()
+
+	// delete all budget fields using wildcard
+	err := DeleteQ(appID, testKey, "$.departments.*.budget")
+	testutil.AssertNoError(t, err, "delete with wildcard")
+
+	// verify all budget fields were deleted
+	departments, err := GetMapQ(appID, testKey, "$.departments")
+	testutil.AssertNoError(t, err, "get departments")
+
+	expected := map[string]any{
+		"sales": map[string]any{
+			"employees": int64(10),
+		},
+		"marketing": map[string]any{
+			"employees": int64(5),
+		},
+		"engineering": map[string]any{
+			"employees": int64(20),
+		},
+	}
+	if !reflect.DeepEqual(departments, expected) {
+		t.Fatalf("departments should be %v, got %v", expected, departments)
+	}
 }
