@@ -43,7 +43,7 @@ func ExistsQ(appID, rootKey, query string) (bool, error) {
 
 	path, err := jsonpath.Parse(query)
 	if err != nil {
-		return false, NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("invalid query: %s", query)
+		return false, NewKeyPathError().Wrap(err).WithMsgF("invalid query: %s", query)
 	}
 
 	results := path.Select(rootValue)

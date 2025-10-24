@@ -53,7 +53,7 @@ func SetQ(appID, rootKey, query string, value any) error {
 	// set the value at the specified path
 	modified, err := setAtPath(rootValue, query, value)
 	if err != nil {
-		return NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("failed to set at path '%s'", query)
+		return NewKeyPathError().Wrap(err).WithMsgF("failed to set at path '%s'", query)
 	}
 
 	// write the modified root value back

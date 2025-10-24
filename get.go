@@ -50,7 +50,7 @@ func GetQ(appID, rootKey, query string) (any, error) {
 
 	path, err := jsonpath.Parse(query)
 	if err != nil {
-		return nil, NewKeyPathError(appID, rootKey).WithMsgF("invalid query: %s", query)
+		return nil, NewKeyPathError().Wrap(err).WithMsgF("invalid query: %s", query)
 	}
 
 	results := path.Select(rootValue)
@@ -78,7 +78,7 @@ func GetStrQ(appID, key, query string) (string, error) {
 
 	strValue, ok := value.(string)
 	if !ok {
-		return "", NewTypeMismatchError(appID, key, string(""), value)
+		return "", NewTypeMismatchError(string(""), value).WithKey(appID, key)
 	}
 
 	return strValue, nil
@@ -100,7 +100,7 @@ func GetBoolQ(appID, key, query string) (bool, error) {
 
 	boolValue, ok := value.(bool)
 	if !ok {
-		return false, NewTypeMismatchError(appID, key, bool(false), value)
+		return false, NewTypeMismatchError(bool(false), value).WithKey(appID, key)
 	}
 
 	return boolValue, nil
@@ -122,7 +122,7 @@ func GetIntQ(appID, key, query string) (int64, error) {
 
 	intValue, ok := value.(int64)
 	if !ok {
-		return 0, NewTypeMismatchError(appID, key, int64(0), value)
+		return 0, NewTypeMismatchError(int64(0), value).WithKey(appID, key)
 	}
 
 	return intValue, nil
@@ -144,7 +144,7 @@ func GetFloatQ(appID, key, query string) (float64, error) {
 
 	floatValue, ok := value.(float64)
 	if !ok {
-		return 0.0, NewTypeMismatchError(appID, key, float64(0.0), value)
+		return 0.0, NewTypeMismatchError(float64(0.0), value).WithKey(appID, key)
 	}
 
 	return floatValue, nil
@@ -166,7 +166,7 @@ func GetDateQ(appID, key, query string) (time.Time, error) {
 
 	dateValue, ok := value.(time.Time)
 	if !ok {
-		return time.Time{}, NewTypeMismatchError(appID, key, time.Time{}, value)
+		return time.Time{}, NewTypeMismatchError(time.Time{}, value).WithKey(appID, key)
 	}
 
 	return dateValue, nil
@@ -188,7 +188,7 @@ func GetDataQ(appID, key, query string) ([]byte, error) {
 
 	dataValue, ok := value.([]byte)
 	if !ok {
-		return nil, NewTypeMismatchError(appID, key, []byte{}, value)
+		return nil, NewTypeMismatchError([]byte{}, value).WithKey(appID, key)
 	}
 
 	return dataValue, nil
@@ -210,7 +210,7 @@ func GetSliceQ(appID, key, query string) ([]any, error) {
 
 	sliceValue, ok := value.([]any)
 	if !ok {
-		return nil, NewTypeMismatchError(appID, key, []any{}, value)
+		return nil, NewTypeMismatchError([]any{}, value).WithKey(appID, key)
 	}
 
 	return sliceValue, nil
@@ -232,7 +232,7 @@ func GetMapQ(appID, key, query string) (map[string]any, error) {
 
 	mapValue, ok := value.(map[string]any)
 	if !ok {
-		return nil, NewTypeMismatchError(appID, key, map[string]any{}, value)
+		return nil, NewTypeMismatchError(map[string]any{}, value).WithKey(appID, key)
 	}
 
 	return mapValue, nil

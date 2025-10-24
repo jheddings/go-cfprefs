@@ -37,7 +37,7 @@ func TestSentinelErrors(t *testing.T) {
 	})
 
 	t.Run("KeyPathErr", func(t *testing.T) {
-		err := NewKeyPathError("com.test.app", "invalid/path")
+		err := NewKeyPathError().Wrap(errors.New("invalid/path"))
 
 		if !errors.Is(err, ErrInvalidKeyPath) {
 			t.Errorf("expected errors.Is(err, ErrInvalidKeyPath) to be true")
@@ -53,14 +53,14 @@ func TestSentinelErrors(t *testing.T) {
 		}
 
 		err = err.WithMsgF("error at segment %d", 2)
-		expected := "error at segment 2: invalid/path [com.test.app]"
+		expected := "error at segment 2: invalid key path\ninvalid/path"
 		if err.Error() != expected {
 			t.Errorf("expected error message %q, got %q", expected, err.Error())
 		}
 	})
 
 	t.Run("TypeMismatchErr", func(t *testing.T) {
-		err := NewTypeMismatchError("com.test.app", "type-key", int64(0), "string value")
+		err := NewTypeMismatchError(int64(0), "string value").WithKey("com.test.app", "type-key")
 
 		if !errors.Is(err, ErrTypeMismatch) {
 			t.Errorf("expected errors.Is(err, ErrTypeMismatch) to be true")

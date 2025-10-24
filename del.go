@@ -1,7 +1,6 @@
 package cfprefs
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/jheddings/go-cfprefs/internal"
@@ -43,7 +42,7 @@ func DeleteQ(appID, rootKey, query string) error {
 	// parse the query
 	path, err := jsonpath.Parse(query)
 	if err != nil {
-		return NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("invalid query: %s", query)
+		return NewKeyPathError().Wrap(err).WithMsgF("invalid query: %s", query)
 	}
 
 	// select the nodes to delete
@@ -63,7 +62,7 @@ func DeleteQ(appID, rootKey, query string) error {
 	for _, node := range located {
 		data, err = deleteValueAtPath(data, node.Path)
 		if err != nil {
-			return NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("failed to delete at path: %s", path)
+			return NewInternalError().Wrap(err).WithMsgF("failed to delete at path: %s", path)
 		}
 	}
 
@@ -76,7 +75,7 @@ func DeleteQ(appID, rootKey, query string) error {
 func deleteValueAtPath(data any, norm spec.NormalizedPath) (any, error) {
 	path, err := jsonpath.Parse(norm.String())
 	if err != nil {
-		return nil, err
+		return nil, NewKeyPathError().Wrap(err).WithMsg("failed to parse normalized path")
 	}
 
 	query := path.Query()
@@ -101,7 +100,7 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 	segment := segments[0]
 	selectors := segment.Selectors()
 	if len(selectors) != 1 {
-		return nil, fmt.Errorf("expected single selector in segment, got %d", len(selectors))
+		return nil, NewInternalError().WithMsgF("expected single selector in segment, got %d", len(selectors))
 	}
 
 	selector := selectors[0]
@@ -111,12 +110,12 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 	if idx, ok := selector.(spec.Index); ok {
 		arr, ok := data.([]any)
 		if !ok {
-			return nil, fmt.Errorf("expected array but got %T", data)
+			return nil, NewTypeMismatchError([]any{}, data)
 		}
 
 		index := int(idx)
 		if index < 0 || index >= len(arr) {
-			return nil, fmt.Errorf("array index out of bounds: %d", index)
+			return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
 		}
 
 		if isLast {
@@ -127,7 +126,7 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 			// continue traversing the remaining segments
 			modified, err := deleteFinalSegment(arr[index], segments[1:])
 			if err != nil {
-				return nil, err
+				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at array index %d", index)
 			}
 
 			// update the array in place
@@ -141,12 +140,12 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 	if name, ok := selector.(spec.Name); ok {
 		obj, ok := data.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("expected object but got %T", data)
+			return nil, NewTypeMismatchError(map[string]any{}, data)
 		}
 
 		key := string(name)
 		if _, exists := obj[key]; !exists {
-			return nil, fmt.Errorf("key not found: %s", key)
+			return nil, NewKeyNotFoundError("", key)
 		}
 
 		if isLast {
@@ -157,7 +156,7 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 			// continue traversing
 			modified, err := deleteFinalSegment(obj[key], segments[1:])
 			if err != nil {
-				return nil, err
+				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at key: %s", key)
 			}
 
 			// update the map in place
@@ -167,5 +166,5 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 		return obj, nil
 	}
 
-	return nil, fmt.Errorf("unsupported selector type for deletion: %T", selector)
+	return nil, NewInternalError().WithMsgF("unsupported selector type for deletion: %T", selector)
 }
