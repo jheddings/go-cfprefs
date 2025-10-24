@@ -99,8 +99,22 @@ func setSegments(data any, segments []pathSegment, value any) (any, error) {
 				// append to array
 				return append(arr, value), nil
 			}
-			// cannot traverse through an append operation
-			return nil, fmt.Errorf("cannot use [] (append) in the middle of a path")
+			// append in the middle of path - create new element
+			var newElement any
+			if len(segments) > 1 && segments[1].isArrayIdx {
+				newElement = []any{}
+			} else {
+				newElement = make(map[string]any)
+			}
+
+			// continue setting in the new element
+			modified, err := setSegments(newElement, segments[1:], value)
+			if err != nil {
+				return nil, err
+			}
+
+			// append the modified element to the array
+			return append(arr, modified), nil
 		}
 
 		// validate array bounds
