@@ -11,17 +11,17 @@ import (
 
 var readCmd = &cobra.Command{
 	Use:   "read <appID> <key>",
-	Short: "Read a preference value (supports keypaths with '/' separator)",
+	Short: "Read a preference value",
 	Long: `Read a preference value for the specified application ID.
 
-The key may be a keypath separated by forward slashes ("/") to traverse nested
-dictionaries. For example, "settings/display/brightness" will retrieve the
-"brightness" value from the nested structure.`,
+Use the --query flag to apply JSONPath queries to the retrieved value. This allows
+for more sophisticated data extraction from complex nested structures.`,
 	Args: cobra.MinimumNArgs(1),
 	Run:  doReadCmd,
 }
 
 func init() {
+	readCmd.Flags().StringP("query", "Q", "", "Apply JSONPath query to the retrieved value")
 	rootCmd.AddCommand(readCmd)
 }
 
@@ -33,7 +33,7 @@ func doReadCmd(cmd *cobra.Command, args []string) {
 	if len(args) == 1 {
 		doReadKeysCmd(args)
 	} else {
-		doReadValueCmd(args)
+		doReadValueCmd(cmd, args)
 	}
 }
 
@@ -54,11 +54,20 @@ func doReadKeysCmd(args []string) {
 	fmt.Println(string(jsonBytes))
 }
 
-func doReadValueCmd(args []string) {
+func doReadValueCmd(cmd *cobra.Command, args []string) {
 	appID, key := args[0], args[1]
-	log.Trace().Str("app", appID).Str("key", key).Msg("Reading preference")
+	query, _ := cmd.Flags().GetString("query")
 
-	value, err := cfprefs.Get(appID, key)
+	log.Trace().Str("app", appID).Str("key", key).Str("query", query).Msg("Reading preference")
+
+	var value any
+	var err error
+
+	if query == "" {
+		value, err = cfprefs.Get(appID, key)
+	} else {
+		value, err = cfprefs.GetQ(appID, key, query)
+	}
 
 	if err == nil {
 		log.Info().Str("app", appID).Str("key", key).Type("type", value).Msg("Value read successfully")
