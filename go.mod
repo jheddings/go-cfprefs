@@ -7,6 +7,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
+	github.com/theory/jsonpath v0.10.2
 )
 
 require (

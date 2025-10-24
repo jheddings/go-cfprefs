@@ -37,7 +37,7 @@ func TestSentinelErrors(t *testing.T) {
 	})
 
 	t.Run("KeyPathErr", func(t *testing.T) {
-		err := NewKeyPathError("com.test.app", "invalid/path")
+		err := NewKeyPathError().Wrap(errors.New("invalid/path"))
 
 		if !errors.Is(err, ErrInvalidKeyPath) {
 			t.Errorf("expected errors.Is(err, ErrInvalidKeyPath) to be true")
@@ -52,15 +52,15 @@ func TestSentinelErrors(t *testing.T) {
 			t.Errorf("expected errors.As to work with *KeyPathErr")
 		}
 
-		err = err.WithMsgF("at segment %d", 2)
-		expected := "key path error: invalid/path [com.test.app] - at segment 2"
+		err = err.WithMsgF("error at segment %d", 2)
+		expected := "error at segment 2: invalid key path\ninvalid/path"
 		if err.Error() != expected {
 			t.Errorf("expected error message %q, got %q", expected, err.Error())
 		}
 	})
 
 	t.Run("TypeMismatchErr", func(t *testing.T) {
-		err := NewTypeMismatchError("com.test.app", "type-key", int64(0), "string value")
+		err := NewTypeMismatchError(int64(0), "string value").WithKey("com.test.app", "type-key")
 
 		if !errors.Is(err, ErrTypeMismatch) {
 			t.Errorf("expected errors.Is(err, ErrTypeMismatch) to be true")
@@ -170,11 +170,21 @@ func TestRealWorldErrors(t *testing.T) {
 		if !errors.Is(err, ErrKeyNotFound) {
 			t.Errorf("expected error to match ErrKeyNotFound sentinel")
 		}
+	})
 
-		// The error should have context about why
-		var knfErr *KeyNotFoundErr
-		if errors.As(err, &knfErr) && knfErr.Msg == "" {
-			t.Errorf("expected error to have contextual message")
+	t.Run("SetInvalidPath", func(t *testing.T) {
+		// Try to set through a non-object
+		err := Set(appID, "scalar-value", "not an object")
+		testutil.AssertNoError(t, err, "setting scalar value")
+		defer Delete(appID, "scalar-value")
+
+		// Try to set a nested field on a scalar
+		err = SetQ(appID, "scalar-value", "$.nested.field", "value")
+		testutil.AssertError(t, err, "setting through scalar")
+
+		// Should be a key path error
+		if !errors.Is(err, ErrInvalidKeyPath) {
+			t.Errorf("expected error to match ErrInvalidKeyPath sentinel")
 		}
 	})
 }

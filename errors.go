@@ -15,13 +15,64 @@ var (
 
 	// ErrTypeMismatch is returned when a value is not of the expected type
 	ErrTypeMismatch = errors.New("type mismatch")
+
+	// ErrInternal is returned when an internal error occurs
+	ErrInternal = errors.New("internal error")
 )
+
+// InternalErr represents an error that is internal to the library
+type InternalErr struct {
+	Err error
+	Msg string
+}
+
+// NewInternalError creates a new InternalErr
+func NewInternalError() *InternalErr {
+	return &InternalErr{Err: ErrInternal}
+}
+
+// WithMsg adds a custom message to the error
+func (e *InternalErr) WithMsg(msg string) *InternalErr {
+	e.Msg = msg
+	return e
+}
+
+// WithMsgF adds a formatted custom message to the error
+func (e *InternalErr) WithMsgF(format string, a ...any) *InternalErr {
+	e.Msg = fmt.Sprintf(format, a...)
+	return e
+}
+
+// Error returns the error message
+func (e *InternalErr) Error() string {
+	if e.Msg == "" {
+		return e.Err.Error()
+	}
+	return fmt.Sprintf("%s: %s", e.Msg, e.Err.Error())
+}
+
+// Is implements support for errors.Is
+func (e *InternalErr) Is(target error) bool {
+	return target == e.Err
+}
+
+// Wrap wraps an error with the InternalErr
+func (e *InternalErr) Wrap(err error) *InternalErr {
+	e.Err = errors.Join(e.Err, err)
+	return e
+}
+
+// Unwrap returns the underlying error
+func (e *InternalErr) Unwrap() error {
+	return e.Err
+}
 
 // KeyNotFoundErr represents an error when a preference key is not found
 type KeyNotFoundErr struct {
 	AppID string
 	Key   string
 	Msg   string
+	Err   error
 }
 
 // NewKeyNotFoundError creates a new KeyNotFoundErr
@@ -54,6 +105,12 @@ func (e *KeyNotFoundErr) Is(target error) bool {
 	return target == ErrKeyNotFound
 }
 
+// Wrap wraps an error with the KeyNotFoundErr
+func (e *KeyNotFoundErr) Wrap(err error) *KeyNotFoundErr {
+	e.Err = errors.Join(e.Err, err)
+	return e
+}
+
 // Unwrap returns the underlying error
 func (e *KeyNotFoundErr) Unwrap() error {
 	return ErrKeyNotFound
@@ -61,14 +118,13 @@ func (e *KeyNotFoundErr) Unwrap() error {
 
 // KeyPathErr represents an error with a key path
 type KeyPathErr struct {
-	AppID string
-	Key   string
-	Msg   string
+	Msg string
+	Err error
 }
 
 // NewKeyPathError creates a new KeyPathErr
-func NewKeyPathError(appID, key string) *KeyPathErr {
-	return &KeyPathErr{AppID: appID, Key: key}
+func NewKeyPathError() *KeyPathErr {
+	return &KeyPathErr{Err: ErrInvalidKeyPath}
 }
 
 // WithMsg adds a custom message to the error
@@ -85,15 +141,21 @@ func (e *KeyPathErr) WithMsgF(format string, a ...any) *KeyPathErr {
 
 // Error returns the error message
 func (e *KeyPathErr) Error() string {
-	if e.Msg == "" {
-		return fmt.Sprintf("key path error: %s [%s]", e.Key, e.AppID)
+	if e.Msg != "" {
+		return fmt.Sprintf("%s: %s", e.Msg, e.Err.Error())
 	}
-	return fmt.Sprintf("key path error: %s [%s] - %s", e.Key, e.AppID, e.Msg)
+	return e.Err.Error()
 }
 
 // Is implements support for errors.Is
 func (e *KeyPathErr) Is(target error) bool {
 	return target == ErrInvalidKeyPath
+}
+
+// Wrap wraps an error with the KeyPathErr
+func (e *KeyPathErr) Wrap(err error) *KeyPathErr {
+	e.Err = errors.Join(e.Err, err)
+	return e
 }
 
 // Unwrap returns the underlying error
@@ -107,11 +169,12 @@ type TypeMismatchErr struct {
 	Key      string
 	Expected any
 	Actual   any
+	Err      error
 }
 
 // NewTypeMismatchError creates a new TypeMismatchErr
-func NewTypeMismatchError(appID, key string, expected, actual any) *TypeMismatchErr {
-	return &TypeMismatchErr{AppID: appID, Key: key, Expected: expected, Actual: actual}
+func NewTypeMismatchError(expected, actual any) *TypeMismatchErr {
+	return &TypeMismatchErr{Expected: expected, Actual: actual}
 }
 
 // Error returns the error message
@@ -122,6 +185,19 @@ func (e *TypeMismatchErr) Error() string {
 // Is implements support for errors.Is
 func (e *TypeMismatchErr) Is(target error) bool {
 	return target == ErrTypeMismatch
+}
+
+// WithKey adds an appID and key to the error
+func (e *TypeMismatchErr) WithKey(appID, key string) *TypeMismatchErr {
+	e.AppID = appID
+	e.Key = key
+	return e
+}
+
+// Wrap wraps an error with the TypeMismatchErr
+func (e *TypeMismatchErr) Wrap(err error) *TypeMismatchErr {
+	e.Err = errors.Join(e.Err, err)
+	return e
 }
 
 // Unwrap returns the underlying error

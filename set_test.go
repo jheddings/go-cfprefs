@@ -8,23 +8,62 @@ import (
 
 // Note: Test helpers are defined in get_test.go since they're shared
 
-func TestSetKeypath(t *testing.T) {
+func TestSet(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	// Clean up any previous test data
+	Delete(appID, "test-key")
+
+	// Test setting a simple value
+	err := Set(appID, "test-key", "hello world")
+	testutil.AssertNoError(t, err, "set simple value")
+	defer Delete(appID, "test-key")
+
+	// Verify the value was set correctly
+	value, err := Get(appID, "test-key")
+	testutil.AssertNoError(t, err, "get value")
+
+	strValue, ok := value.(string)
+	if !ok {
+		t.Fatalf("value is not a string: got %T", value)
+	}
+	if strValue != "hello world" {
+		t.Fatalf("value does not match: expected 'hello world', got '%s'", strValue)
+	}
+
+	// Test replacing an existing value
+	err = Set(appID, "test-key", int64(42))
+	testutil.AssertNoError(t, err, "replace value")
+
+	value, err = Get(appID, "test-key")
+	testutil.AssertNoError(t, err, "get replaced value")
+
+	intValue, ok := value.(int64)
+	if !ok {
+		t.Fatalf("value is not an int64: got %T", value)
+	}
+	if intValue != 42 {
+		t.Fatalf("value does not match: expected 42, got %d", intValue)
+	}
+}
+
+func TestSetQ(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	// Clean up any previous test data
 	Delete(appID, "nested-test")
 
 	// Test setting a value in a nested path that doesn't exist yet
-	err := Set(appID, "nested-test/level1/level1.1/value", "hello from nested path")
+	err := SetQ(appID, "nested-test", "$.level1.level1_1.value", "hello from nested path")
 	testutil.AssertNoError(t, err, "set nested path")
 	defer Delete(appID, "nested-test")
 
 	// Add a sibling branch
-	err = Set(appID, "nested-test/neighbor/level1.1/value", "hello from neighbor")
+	err = SetQ(appID, "nested-test", "$.neighbor.level1_1.value", "hello from neighbor")
 	testutil.AssertNoError(t, err, "set sibling branch")
 
-	// Verify the value was set correctly
-	value, err := Get(appID, "nested-test/level1/level1.1/value")
+	// Verify the value was set correctly using GetQ
+	value, err := GetQ(appID, "nested-test", "$.level1.level1_1.value")
 	testutil.AssertNoError(t, err, "get nested value")
 
 	strValue, ok := value.(string)
@@ -55,21 +94,21 @@ func TestSetKeypath(t *testing.T) {
 		t.Fatalf("level1 is not a dictionary: got %T", level1Value)
 	}
 
-	// Check level1.1 exists
-	level2Value, ok := level1Dict["level1.1"]
+	// Check level1_1 exists
+	level2Value, ok := level1Dict["level1_1"]
 	if !ok {
-		t.Fatal("level1.1 dictionary not found")
+		t.Fatal("level1_1 dictionary not found")
 	}
 
 	level2Dict, ok := level2Value.(map[string]any)
 	if !ok {
-		t.Fatalf("level1.1 is not a dictionary: got %T", level2Value)
+		t.Fatalf("level1_1 is not a dictionary: got %T", level2Value)
 	}
 
 	// Check the final value
 	finalValue, ok := level2Dict["value"]
 	if !ok {
-		t.Fatal("final value not found in level1.1 dictionary")
+		t.Fatal("final value not found in level1_1 dictionary")
 	}
 
 	finalStr, ok := finalValue.(string)
@@ -81,49 +120,124 @@ func TestSetKeypath(t *testing.T) {
 	}
 
 	// Test adding another value to the same nested structure
-	err = Set(appID, "nested-test/level1/level1.1/another", int64(42))
+	err = SetQ(appID, "nested-test", "$.level1.level1_1.another", int64(42))
 	testutil.AssertNoError(t, err, "set another value in existing path")
 
 	// Verify both values exist
-	value1, err := Get(appID, "nested-test/level1/level1.1/value")
+	value1, err := GetQ(appID, "nested-test", "$.level1.level1_1.value")
 	testutil.AssertNoError(t, err, "get first value")
 	if value1.(string) != "hello from nested path" {
 		t.Fatal("first value was modified when setting second value")
 	}
 
-	value2, err := Get(appID, "nested-test/level1/level1.1/another")
+	value2, err := GetQ(appID, "nested-test", "$.level1.level1_1.another")
 	testutil.AssertNoError(t, err, "get second value")
 	if value2.(int64) != 42 {
 		t.Fatalf("second value does not match: expected 42, got %d", value2.(int64))
 	}
 }
 
-// Error path tests
-
-func TestSetEmptyKeypath(t *testing.T) {
+func TestSetQArrayOperations(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Test setting with empty keypath
-	err := Set(appID, "", "value")
-	testutil.AssertError(t, err, "empty keypath")
+	// Clean up any previous test data
+	Delete(appID, "array-test")
+	defer Delete(appID, "array-test")
+
+	// Create an array with some initial items
+	err := Set(appID, "array-test", map[string]any{
+		"items": []any{"first", "second", "third"},
+	})
+	testutil.AssertNoError(t, err, "set initial array")
+
+	// Test updating an array element
+	err = SetQ(appID, "array-test", "$.items[1]", "updated-second")
+	testutil.AssertNoError(t, err, "update array element")
+
+	value, err := GetQ(appID, "array-test", "$.items[1]")
+	testutil.AssertNoError(t, err, "get updated array element")
+	if value.(string) != "updated-second" {
+		t.Fatalf("array element not updated: expected 'updated-second', got '%s'", value.(string))
+	}
+
+	// Test appending to array
+	err = SetQ(appID, "array-test", "$.items[]", "fourth")
+	testutil.AssertNoError(t, err, "append to array")
+
+	items, err := GetSliceQ(appID, "array-test", "$.items")
+	testutil.AssertNoError(t, err, "get array after append")
+	if len(items) != 4 {
+		t.Fatalf("array length incorrect: expected 4, got %d", len(items))
+	}
+	if items[3].(string) != "fourth" {
+		t.Fatalf("appended value incorrect: expected 'fourth', got '%s'", items[3].(string))
+	}
+
+	// test appending a new element with a new field
+	err = SetQ(appID, "array-test", "$.pets[].name", "Fido")
+	testutil.AssertNoError(t, err, "append new element")
+
+	err = SetQ(appID, "array-test", "$.pets[].name", "Spot")
+	testutil.AssertNoError(t, err, "append new element")
+
+	items, err = GetSliceQ(appID, "array-test", "$.pets")
+	testutil.AssertNoError(t, err, "get array after append")
+	if len(items) != 2 {
+		t.Fatalf("array length incorrect: expected 2, got %d", len(items))
+	}
+	if items[0].(map[string]any)["name"].(string) != "Fido" {
+		t.Fatalf("appended value incorrect: expected 'Fido', got '%s'", items[0].(map[string]any)["name"].(string))
+	}
+	if items[1].(map[string]any)["name"].(string) != "Spot" {
+		t.Fatalf("appended value incorrect: expected 'Spot', got '%s'", items[1].(map[string]any)["name"].(string))
+	}
+
+	// Test array index out of bounds
+	err = SetQ(appID, "array-test", "$.items[10]", "should fail")
+	testutil.AssertError(t, err, "array index out of bounds")
+	err = SetQ(appID, "array-test", "$.pets[3]", "should fail")
+	testutil.AssertError(t, err, "array index out of bounds")
 }
 
-func TestSetKeypathOnlySlashes(t *testing.T) {
+func TestSetQReplaceRoot(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Test keypath with only slashes
-	err := Set(appID, "///", "value")
-	testutil.AssertError(t, err, "keypath with only slashes")
+	// Clean up any previous test data
+	Delete(appID, "replace-test")
+	defer Delete(appID, "replace-test")
+
+	// Set initial value
+	err := Set(appID, "replace-test", map[string]any{"old": "value"})
+	testutil.AssertNoError(t, err, "set initial value")
+
+	// Replace entire root with $ or empty query
+	newValue := map[string]any{"new": "value"}
+	err = SetQ(appID, "replace-test", "$", newValue)
+	testutil.AssertNoError(t, err, "replace root with $")
+
+	value, err := Get(appID, "replace-test")
+	testutil.AssertNoError(t, err, "get replaced value")
+
+	mapValue, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("value is not a map: got %T", value)
+	}
+	if _, hasOld := mapValue["old"]; hasOld {
+		t.Fatal("old value still exists after replacement")
+	}
+	if mapValue["new"] != "value" {
+		t.Fatalf("new value incorrect: expected 'value', got '%v'", mapValue["new"])
+	}
 }
 
-func TestSetKeypathNonDictSegment(t *testing.T) {
+func TestSetQNonObjectSegment(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	// Set a simple string value
 	cleanup := setupTest(t, appID, "simple-string", "hello")
 	defer cleanup()
 
-	// Try to set a nested value through a non-dict segment
-	err := Set(appID, "simple-string/nested/value", "should fail")
-	testutil.AssertError(t, err, "setting through non-dict segment")
+	// Try to set a nested value through a non-object segment
+	err := SetQ(appID, "simple-string", "$.nested.value", "should fail")
+	testutil.AssertError(t, err, "setting through non-object segment")
 }
