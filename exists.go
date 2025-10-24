@@ -2,10 +2,9 @@ package cfprefs
 
 import (
 	"errors"
-	"strings"
 
-	"github.com/PaesslerAG/jsonpath"
 	"github.com/jheddings/go-cfprefs/internal"
+	"github.com/theory/jsonpath"
 )
 
 // Exists checks if a preference key exists for the given application ID.
@@ -42,15 +41,11 @@ func ExistsQ(appID, rootKey, query string) (bool, error) {
 		return true, nil
 	}
 
-	_, err = jsonpath.Get(query, rootValue)
+	path, err := jsonpath.Parse(query)
 	if err != nil {
-		// Check if this is a parsing error (invalid JSONPath syntax)
-		if strings.Contains(err.Error(), "parsing error") {
-			return false, NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("invalid JSONPath: %s", query)
-		}
-		// For "unknown key" or "out of bounds" errors, the path just doesn't exist
-		return false, nil
+		return false, NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("invalid query: %s", query)
 	}
 
-	return true, nil
+	results := path.Select(rootValue)
+	return len(results) > 0, nil
 }

@@ -3,8 +3,8 @@ package cfprefs
 import (
 	"time"
 
-	"github.com/PaesslerAG/jsonpath"
 	"github.com/jheddings/go-cfprefs/internal"
+	"github.com/theory/jsonpath"
 )
 
 // GetKeys retrieves all keys for the given appID.
@@ -48,12 +48,17 @@ func GetQ(appID, rootKey, query string) (any, error) {
 		return rootValue, nil
 	}
 
-	result, err := jsonpath.Get(query, rootValue)
+	path, err := jsonpath.Parse(query)
 	if err != nil {
-		return nil, NewKeyPathError(appID, rootKey).WithMsgF("JSONPath query failed for path '%s'", query)
+		return nil, NewKeyPathError(appID, rootKey).WithMsgF("invalid query: %s", query)
 	}
 
-	return result, nil
+	results := path.Select(rootValue)
+	if len(results) == 0 {
+		return nil, NewKeyNotFoundError(appID, rootKey).WithMsgF("no results for query: %s", query)
+	}
+
+	return results[0], nil
 }
 
 // GetStr retrieves a string preference value for the given key and application ID.
