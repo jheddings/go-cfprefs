@@ -88,12 +88,12 @@ func deleteValueAtPath(data any, norm spec.NormalizedPath) (any, error) {
 	}
 
 	// recursively delete using the segments
-	return deleteSegments(data, segments)
+	return deleteFinalSegment(data, segments)
 }
 
-// deleteSegments recursively traverses the data structure and deletes the value
-// at the specified path, returning the modified structure.
-func deleteSegments(data any, segments []*spec.Segment) (any, error) {
+// deleteFinalSegment recursively traverses the data structure and deletes the value
+// at the final segment of the path, returning the modified structure.
+func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 	if len(segments) == 0 {
 		return data, nil
 	}
@@ -121,17 +121,19 @@ func deleteSegments(data any, segments []*spec.Segment) (any, error) {
 
 		if isLast {
 			// delete the element at this index
-			return append(arr[:index], arr[index+1:]...), nil
+			arr = append(arr[:index], arr[index+1:]...)
+
+		} else {
+			// continue traversing the remaining segments
+			modified, err := deleteFinalSegment(arr[index], segments[1:])
+			if err != nil {
+				return nil, err
+			}
+
+			// update the array in place
+			arr[index] = modified
 		}
 
-		// continue traversing the remaining segments
-		modified, err := deleteSegments(arr[index], segments[1:])
-		if err != nil {
-			return nil, err
-		}
-
-		// update the array in place
-		arr[index] = modified
 		return arr, nil
 	}
 
@@ -150,17 +152,18 @@ func deleteSegments(data any, segments []*spec.Segment) (any, error) {
 		if isLast {
 			// delete the key from the map
 			delete(obj, key)
-			return obj, nil
+
+		} else {
+			// continue traversing
+			modified, err := deleteFinalSegment(obj[key], segments[1:])
+			if err != nil {
+				return nil, err
+			}
+
+			// update the map in place
+			obj[key] = modified
 		}
 
-		// continue traversing
-		modified, err := deleteSegments(obj[key], segments[1:])
-		if err != nil {
-			return nil, err
-		}
-
-		// update the map in place
-		obj[key] = modified
 		return obj, nil
 	}
 
