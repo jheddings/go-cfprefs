@@ -18,7 +18,7 @@ func GetKeys(appID string) ([]string, error) {
 func Get(appID, key string) (any, error) {
 	value, err := internal.Get(appID, key)
 	if err != nil {
-		return nil, err
+		return nil, NewKeyNotFoundError(appID, key).Wrap(err)
 	}
 
 	return value, nil
@@ -41,10 +41,10 @@ func Get(appID, key string) (any, error) {
 func GetQ(appID, rootKey, query string) (any, error) {
 	rootValue, err := internal.Get(appID, rootKey)
 	if err != nil {
-		return nil, NewKeyNotFoundError(appID, rootKey)
+		return nil, NewKeyNotFoundError(appID, rootKey).Wrap(err)
 	}
 
-	if query == "" {
+	if query == "" || query == "$" {
 		return rootValue, nil
 	}
 

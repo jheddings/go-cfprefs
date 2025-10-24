@@ -2,8 +2,6 @@ package internal
 
 // This file contains the public API operations for CoreFoundation preferences.
 
-// File imports removed - using custom error types
-
 // TODO: fail gracefully if not running on macOS
 
 /*
@@ -33,7 +31,7 @@ func Get(appID, key string) (any, error) {
 	// https://developer.apple.com/documentation/corefoundation/cfpreferencescopyappvalue(_:_:)
 	value := C.CFPreferencesCopyAppValue(keyRef, appIDRef)
 	if value == nilCFType {
-		return nil, NewCFError("get preference", nil).WithMsgF("key not found: %s [%s]", key, appID)
+		return nil, CFLookupError().WithMsgF("key '%s' not found in app '%s'", key, appID)
 	}
 	defer C.CFRelease(value)
 

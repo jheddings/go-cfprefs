@@ -22,6 +22,7 @@ type KeyNotFoundErr struct {
 	AppID string
 	Key   string
 	Msg   string
+	Err   error
 }
 
 // NewKeyNotFoundError creates a new KeyNotFoundErr
@@ -52,6 +53,12 @@ func (e *KeyNotFoundErr) Error() string {
 // Is implements support for errors.Is
 func (e *KeyNotFoundErr) Is(target error) bool {
 	return target == ErrKeyNotFound
+}
+
+// Wrap wraps an error with the KeyNotFoundErr
+func (e *KeyNotFoundErr) Wrap(err error) *KeyNotFoundErr {
+	e.Err = errors.Join(e.Err, err)
+	return e
 }
 
 // Unwrap returns the underlying error

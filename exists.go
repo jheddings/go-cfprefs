@@ -1,6 +1,9 @@
 package cfprefs
 
 import (
+	"errors"
+	"strings"
+
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/jheddings/go-cfprefs/internal"
 )
@@ -27,18 +30,27 @@ func Exists(appID, key string) (bool, error) {
 //	exists, err := ExistsQ("com.example.app", "data", "$.items[?(@.active == true)]")
 func ExistsQ(appID, rootKey, query string) (bool, error) {
 	rootValue, err := internal.Get(appID, rootKey)
+
 	if err != nil {
-		return false, nil
+		if errors.Is(err, internal.ErrCFLookup) {
+			return false, nil
+		}
+		return false, err
 	}
 
 	if query == "" || query == "$" {
 		return true, nil
 	}
 
-	result, err := jsonpath.Get(query, rootValue)
+	_, err = jsonpath.Get(query, rootValue)
 	if err != nil {
-		return false, NewKeyPathError(appID, rootKey).WithMsgF("JSONPath query failed for path '%s'", query)
+		// Check if this is a parsing error (invalid JSONPath syntax)
+		if strings.Contains(err.Error(), "parsing error") {
+			return false, NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("invalid JSONPath: %s", query)
+		}
+		// For "unknown key" or "out of bounds" errors, the path just doesn't exist
+		return false, nil
 	}
 
-	return result != nil, nil
+	return true, nil
 }
