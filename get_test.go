@@ -216,39 +216,67 @@ func TestGetEmptyKeypath(t *testing.T) {
 func TestQuery(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	simpleData := map[string]any{
-		"name": "John Doe",
+	testData := map[string]any{
+		"name": "Jane Doe",
 		"age":  30,
 		"city": "Anytown",
+		"items": []any{
+			"first",
+			"second",
+			"third",
+		},
+		"pets": []any{
+			map[string]any{
+				"name": "Fluffy",
+				"type": "dog",
+			},
+			map[string]any{
+				"name": "Whiskers",
+				"type": "cat",
+			},
+		},
 	}
 
-	cleanup := setupTest(t, appID, "userData", simpleData)
+	cleanup := setupTest(t, appID, "bio", testData)
 	defer cleanup()
 
 	t.Run("Simple field access", func(t *testing.T) {
-		value, err := GetQ(appID, "userData", "$.name")
+		value, err := GetQ(appID, "bio", "$.name")
 		testutil.AssertNoError(t, err, "get user name")
-
-		if value != "John Doe" {
-			t.Errorf("expected 'John Doe', got %v", value)
+		if value != "Jane Doe" {
+			t.Errorf("expected 'Jane Doe', got %v", value)
 		}
 	})
 
 	t.Run("Numeric field access", func(t *testing.T) {
-		value, err := GetQ(appID, "userData", "$.age")
+		value, err := GetQ(appID, "bio", "$.age")
 		testutil.AssertNoError(t, err, "get user age")
-
 		if !testutil.ValuesEqualApprox(int64(30), value) {
 			t.Fatalf("expected 30, got %v", value)
 		}
 	})
 
 	t.Run("Root object access", func(t *testing.T) {
-		value, err := GetQ(appID, "userData", "$")
+		value, err := GetQ(appID, "bio", "$")
 		testutil.AssertNoError(t, err, "get root object")
+		if !testutil.ValuesEqualApprox(testData, value) {
+			t.Fatalf("expected %v, got %v", testData, value)
+		}
+	})
 
-		if !testutil.ValuesEqualApprox(simpleData, value) {
-			t.Fatalf("expected %v, got %v", simpleData, value)
+	t.Run("Array access", func(t *testing.T) {
+		value, err := GetQ(appID, "bio", "$.items[0]")
+		testutil.AssertNoError(t, err, "get first item")
+		if value != "first" {
+			t.Fatalf("expected 'first', got %v", value)
+		}
+	})
+
+	t.Run("Nested array access", func(t *testing.T) {
+		value, err := GetQ(appID, "bio", "$.pets[0].name")
+		testutil.AssertNoError(t, err, "get first pet name")
+		if value != "Fluffy" {
+			t.Fatalf("expected 'Fluffy', got %v", value)
 		}
 	})
 }

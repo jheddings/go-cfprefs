@@ -11,31 +11,10 @@ import (
 var (
 	// ErrEmptyKeypath is returned when an empty keypath is provided
 	ErrEmptyKeypath = errors.New("keypath cannot be empty")
+
+	// ErrInvalidJSONPath is returned when an invalid JSONPath is provided
+	ErrInvalidJSONPath = errors.New("invalid JSONPath expression")
 )
-
-// splitKeypath splits a keypath into segments and validates input.
-// Returns the segments or an error if the input is invalid.
-func splitKeypath(keypath string) ([]string, error) {
-	if keypath == "" {
-		return nil, ErrEmptyKeypath
-	}
-
-	// Split and filter out empty segments (in case of double slashes)
-	segments := strings.Split(keypath, "/")
-	filtered := make([]string, 0, len(segments))
-
-	for _, segment := range segments {
-		if segment != "" {
-			filtered = append(filtered, segment)
-		}
-	}
-
-	if len(filtered) == 0 {
-		return nil, ErrEmptyKeypath
-	}
-
-	return filtered, nil
-}
 
 // pathSegment represents a single segment in a JSONPath
 type pathSegment struct {
@@ -45,7 +24,7 @@ type pathSegment struct {
 }
 
 // parseJSONPath parses a simple JSONPath expression into segments.
-// Supports: $.field, $.field.nested, $.field[0], $.array[0].field
+// Supports: $.field, $.field.nested, $.field[0], $.array[0].field, $.array[]
 func parseJSONPath(path string) ([]pathSegment, error) {
 	path = strings.TrimPrefix(path, "$")
 	path = strings.TrimPrefix(path, ".")
@@ -54,8 +33,8 @@ func parseJSONPath(path string) ([]pathSegment, error) {
 		return []pathSegment{}, nil
 	}
 
-	// match field names and array indices
-	re := regexp.MustCompile(`([^.\[\]]+)|\[(\d+)\]`)
+	// match field names, array indices, and empty array brackets
+	re := regexp.MustCompile(`([^.\[\]]+)|\[(\d*)\]`)
 	matches := re.FindAllStringSubmatch(path, -1)
 
 	var segments []pathSegment
@@ -63,6 +42,9 @@ func parseJSONPath(path string) ([]pathSegment, error) {
 		if match[1] != "" {
 			// field access
 			segments = append(segments, pathSegment{field: match[1], isArrayIdx: false})
+		} else if match[0] == "[]" {
+			// empty array brackets - append operation
+			segments = append(segments, pathSegment{index: -1, isArrayIdx: true})
 		} else if match[2] != "" {
 			// array index access
 			idx, err := strconv.Atoi(match[2])

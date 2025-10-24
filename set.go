@@ -1,64 +1,156 @@
 package cfprefs
 
 import (
+	"fmt"
+
 	"github.com/jheddings/go-cfprefs/internal"
 )
 
-// Set writes a preference value for the given keypath and application ID.
-// If any intermediate dictionaries do not exist, they will be created.
-// Returns an error if the operation fails or if any intermediate segment
-// is not a dictionary.
-func Set(appID, keypath string, value any) error {
-	segments, err := splitKeypath(keypath)
+// Set writes a preference value for the given key and application ID.
+// This replaces the entire value at the specified key.
+func Set(appID, key string, value any) error {
+	return internal.Set(appID, key, value)
+}
+
+// SetQ sets a value using JSONPath syntax within a specific root key.
+// The JSONPath query is applied to the value stored under the rootKey.
+// Missing field segments will create new maps. Array indices must be valid
+// or use [] to append to an existing array.
+//
+// Example usage:
+//
+//	// Set a nested value: $.user.name
+//	err := SetQ("com.example.app", "userData", "$.user.name", "John Doe")
+//
+//	// Set array element: $.items[0]
+//	err := SetQ("com.example.app", "data", "$.items[0]", item)
+//
+//	// Append to array: $.items[]
+//	err := SetQ("com.example.app", "data", "$.items[]", newItem)
+func SetQ(appID, rootKey, query string, value any) error {
+	// if the query is empty or "$", replace the entire root key
+	if query == "" || query == "$" {
+		return internal.Set(appID, rootKey, value)
+	}
+
+	// get or create the root value
+	var rootValue any
+	exists, err := internal.Exists(appID, rootKey)
 	if err != nil {
 		return err
 	}
 
-	// if there's only one segment, just set the value directly
-	if len(segments) == 1 {
-		return internal.Set(appID, keypath, value)
-	}
-
-	// get or create the root dictionary
-	var rootDict map[string]any
-	exists, err := Exists(appID, segments[0])
-	if err != nil {
-		return err
-	} else if exists {
-		if rootDict, err = GetMap(appID, segments[0]); err != nil {
+	if exists {
+		rootValue, err = internal.Get(appID, rootKey)
+		if err != nil {
 			return err
 		}
 	} else {
-		rootDict = make(map[string]any)
+		// create a new map as the root value
+		rootValue = make(map[string]any)
 	}
 
-	// traverse remaining segments
-	currentDict := rootDict
-	for i := 1; i < len(segments)-1; i++ {
-		segment := segments[i]
+	// set the value at the specified path
+	modified, err := setAtPath(rootValue, query, value)
+	if err != nil {
+		return NewKeyPathError(appID, rootKey).Wrap(err).WithMsgF("failed to set at path '%s'", query)
+	}
 
-		value, exists := currentDict[segment]
+	// write the modified root value back
+	return internal.Set(appID, rootKey, modified)
+}
 
-		if !exists {
-			// create a new dictionary for this segment
-			newDict := make(map[string]any)
-			currentDict[segment] = newDict
-			currentDict = newDict
+// setAtPath sets a value at the given JSONPath in the data structure.
+// Returns the modified structure or an error if the path cannot be set.
+func setAtPath(data any, path string, value any) (any, error) {
+	segments, err := parseJSONPath(path)
+	if err != nil {
+		return nil, err
+	}
 
-		} else {
-			// segments must be dictionaries to traverse further
-			nextDict, ok := value.(map[string]any)
-			if !ok {
-				return NewKeyPathError(appID, keypath).WithMsgF("segment '%s' exists but is not a dictionary", segment)
-			}
-			currentDict = nextDict
+	// if no segments (shouldn't happen after validation), return the value
+	if len(segments) == 0 {
+		return value, nil
+	}
+
+	return setSegments(data, segments, value)
+}
+
+// setSegments navigates to the target and sets the value, creating
+// intermediate structures as needed.
+func setSegments(data any, segments []pathSegment, value any) (any, error) {
+	if len(segments) == 0 {
+		return value, nil
+	}
+
+	segment := segments[0]
+	isLast := len(segments) == 1
+
+	if segment.isArrayIdx {
+		// handle array index
+		arr, ok := data.([]any)
+		if !ok {
+			return nil, fmt.Errorf("expected array but got %T", data)
 		}
+
+		// check for append operation (empty index)
+		if segment.index == -1 {
+			if isLast {
+				// append to array
+				return append(arr, value), nil
+			}
+			// cannot traverse through an append operation
+			return nil, fmt.Errorf("cannot use [] (append) in the middle of a path")
+		}
+
+		// validate array bounds
+		if segment.index < 0 || segment.index >= len(arr) {
+			return nil, fmt.Errorf("array index out of bounds: %d", segment.index)
+		}
+
+		if isLast {
+			// set the element at the index
+			arr[segment.index] = value
+			return arr, nil
+		}
+
+		// continue traversing
+		modified, err := setSegments(arr[segment.index], segments[1:], value)
+		if err != nil {
+			return nil, err
+		}
+		arr[segment.index] = modified
+		return arr, nil
+	} else {
+		// handle field access
+		obj, ok := data.(map[string]any)
+		if !ok {
+			// if not a map, we can't set a field on it
+			return nil, fmt.Errorf("expected object but got %T", data)
+		}
+
+		if isLast {
+			// set the field
+			obj[segment.field] = value
+			return obj, nil
+		}
+
+		// get or create the child
+		child, exists := obj[segment.field]
+		if !exists {
+			// create new structure based on next segment
+			if len(segments) > 1 && segments[1].isArrayIdx {
+				child = []any{}
+			} else {
+				child = make(map[string]any)
+			}
+		}
+
+		modified, err := setSegments(child, segments[1:], value)
+		if err != nil {
+			return nil, err
+		}
+		obj[segment.field] = modified
+		return obj, nil
 	}
-
-	// set the final value
-	finalKey := segments[len(segments)-1]
-	currentDict[finalKey] = value
-
-	// write the modified root dictionary back
-	return internal.Set(appID, segments[0], rootDict)
 }
