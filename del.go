@@ -97,74 +97,58 @@ func walkOrDelete(data any, segments []*spec.Segment) (any, error) {
 		return data, nil
 	}
 
-	segment := segments[0]
-	selectors := segment.Selectors()
-	if len(selectors) != 1 {
-		return nil, NewInternalError().WithMsgF("expected single selector in segment, got %d", len(selectors))
-	}
-
-	selector := selectors[0]
-	isLast := len(segments) == 1
-
-	// check if this is an segment index selector (array access)
-	if seg, ok := selector.(spec.Index); ok {
-		arr, ok := data.([]any)
-		if !ok {
-			return nil, NewTypeMismatchError([]any{}, data)
-		}
-
-		index := int(seg)
-		if index < 0 || index >= len(arr) {
-			return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
-		}
-
-		if isLast {
+	handler := walkHandler{
+		onArrayLast: func(arr []any, index int) ([]any, error) {
+			if index < 0 || index >= len(arr) {
+				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
+			}
 			// delete the element at this index
-			arr = append(arr[:index], arr[index+1:]...)
+			return append(arr[:index], arr[index+1:]...), nil
+		},
 
-		} else {
-			// continue traversing the remaining segments
-			modified, err := walkOrDelete(arr[index], segments[1:])
+		onArrayContinue: func(arr []any, index int, element any, remaining []*spec.Segment) ([]any, error) {
+			// validate bounds for delete operations
+			if index < 0 || index >= len(arr) {
+				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
+			}
+
+			// continue traversing the element
+			modified, err := walkOrDelete(element, remaining)
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at array index %d", index)
 			}
 
 			// update the array in place
 			arr[index] = modified
-		}
+			return arr, nil
+		},
 
-		return arr, nil
-	}
-
-	// check if this is a segment name selector (field access)
-	if seg, ok := selector.(spec.Name); ok {
-		obj, ok := data.(map[string]any)
-		if !ok {
-			return nil, NewTypeMismatchError(map[string]any{}, data)
-		}
-
-		key := string(seg)
-		if _, exists := obj[key]; !exists {
-			return nil, NewKeyNotFoundError("", key)
-		}
-
-		if isLast {
+		onMapLast: func(obj map[string]any, key string) (map[string]any, error) {
+			if _, exists := obj[key]; !exists {
+				return nil, NewKeyNotFoundError("", key)
+			}
 			// delete the key from the map
 			delete(obj, key)
+			return obj, nil
+		},
 
-		} else {
-			// continue traversing
-			modified, err := walkOrDelete(obj[key], segments[1:])
+		onMapContinue: func(obj map[string]any, key string, child any, remaining []*spec.Segment) (map[string]any, error) {
+			// child must exist for delete operations
+			if child == nil {
+				return nil, NewKeyNotFoundError("", key)
+			}
+
+			// continue traversing the child
+			modified, err := walkOrDelete(child, remaining)
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at key: %s", key)
 			}
 
 			// update the map in place
 			obj[key] = modified
-		}
-
-		return obj, nil
+			return obj, nil
+		},
 	}
 
-	return nil, NewInternalError().WithMsgF("unsupported selector type for deletion: %T", selector)
+	return walkPath(data, segments, handler)
 }

@@ -81,116 +81,95 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 		return value, nil
 	}
 
-	segment := segments[0]
-	selectors := segment.Selectors()
-	if len(selectors) != 1 {
-		return nil, NewInternalError().WithMsgF("expected single selector in segment, got %d", len(selectors))
-	}
-
-	selector := selectors[0]
-	isLast := len(segments) == 1
-
-	// check if this is an segment index selector (array access)
-	if idx, ok := selector.(spec.Index); ok {
-		index := int(idx)
-
-		// make sure the data in this segment is an array
-		arr, ok := data.([]any)
-		if !ok {
-			return nil, NewTypeMismatchError([]any{}, data)
-		}
-
-		// check for append operation (empty index)
-		if index == -1 {
-			if isLast {
+	handler := walkHandler{
+		onArrayLast: func(arr []any, index int) ([]any, error) {
+			// check for append operation (empty index)
+			if index == -1 {
 				return append(arr, value), nil
 			}
 
-			// append in the middle of path - create new element
-			var newElement any
-			if len(segments) > 1 {
-				nextSelector := segments[1].Selectors()[0]
-				if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
-					newElement = []any{}
+			// validate array bounds
+			if index < 0 || index >= len(arr) {
+				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
+			}
+
+			// set the element at the index
+			arr[index] = value
+			return arr, nil
+		},
+
+		onArrayContinue: func(arr []any, index int, element any, remaining []*spec.Segment) ([]any, error) {
+			// check for append operation (empty index)
+			if index == -1 {
+				// append in the middle of path - create new element based on next segment
+				var newElement any
+				if len(remaining) > 0 {
+					nextSelector := remaining[0].Selectors()[0]
+					if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
+						newElement = []any{}
+					} else {
+						newElement = make(map[string]any)
+					}
 				} else {
 					newElement = make(map[string]any)
 				}
-			} else {
-				newElement = make(map[string]any)
+
+				// continue setting in the new element
+				modified, err := walkOrSet(newElement, remaining, value)
+				if err != nil {
+					return nil, err
+				}
+
+				// append the modified element to the array
+				return append(arr, modified), nil
 			}
 
-			// continue setting in the new element
-			modified, err := walkOrSet(newElement, segments[1:], value)
+			// validate bounds for normal indices
+			if index < 0 || index >= len(arr) {
+				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
+			}
+
+			// continue traversing the existing element
+			modified, err := walkOrSet(element, remaining, value)
 			if err != nil {
 				return nil, err
 			}
 
-			// append the modified element to the array
-			return append(arr, modified), nil
-		}
-
-		// validate array bounds
-		if index < 0 || index >= len(arr) {
-			return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
-		}
-
-		// set the element at the index if this is the last segment
-		if isLast {
-			arr[index] = value
+			arr[index] = modified
 			return arr, nil
-		}
+		},
 
-		// continue traversing the remaining segments
-		modified, err := walkOrSet(arr[index], segments[1:], value)
-		if err != nil {
-			return nil, err
-		}
-
-		arr[index] = modified
-		return arr, nil
-	}
-
-	// handle field access
-	if field, ok := selector.(spec.Name); ok {
-		name := string(field)
-
-		// make sure the data in this segment is a map
-		obj, ok := data.(map[string]any)
-		if !ok {
-			return nil, NewTypeMismatchError(map[string]any{}, data)
-		}
-
-		// set the field if this is the last segment
-		if isLast {
-			obj[name] = value
+		onMapLast: func(obj map[string]any, key string) (map[string]any, error) {
+			obj[key] = value
 			return obj, nil
-		}
+		},
 
-		// create the child if it doesn't exist
-		child, exists := obj[name]
-		if !exists {
-			// create new structure based on next segment
-			if len(segments) > 1 {
-				nextSelector := segments[1].Selectors()[0]
-				if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
-					child = []any{}
+		onMapContinue: func(obj map[string]any, key string, child any, remaining []*spec.Segment) (map[string]any, error) {
+			// if child is nil, create it based on the next segment
+			if child == nil {
+				// create new structure based on next segment
+				if len(remaining) > 0 {
+					nextSelector := remaining[0].Selectors()[0]
+					if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
+						child = []any{}
+					} else {
+						child = make(map[string]any)
+					}
 				} else {
 					child = make(map[string]any)
 				}
-			} else {
-				child = make(map[string]any)
 			}
-		}
 
-		// continue traversing the remaining segments
-		modified, err := walkOrSet(child, segments[1:], value)
-		if err != nil {
-			return nil, err
-		}
+			// continue traversing with the child
+			modified, err := walkOrSet(child, remaining, value)
+			if err != nil {
+				return nil, err
+			}
 
-		obj[name] = modified
-		return obj, nil
+			obj[key] = modified
+			return obj, nil
+		},
 	}
 
-	return nil, NewInternalError().WithMsgF("unsupported selector type for setting: %T", selector)
+	return walkPath(data, segments, handler)
 }
