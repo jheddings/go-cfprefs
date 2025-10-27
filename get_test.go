@@ -1,7 +1,6 @@
 package cfprefs
 
 import (
-	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -22,56 +21,6 @@ func setupTest(t *testing.T, appID, key string, value any) func() {
 		if err := Delete(appID, key); err != nil {
 			t.Errorf("failed to cleanup test key: %v", err)
 		}
-	}
-}
-
-func TestGetKeypath(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	testValue := map[string]any{
-		"string": "hello",
-		"number": int64(42),
-		"float":  3.14,
-		"bool":   true,
-	}
-
-	cleanup := setupTest(t, appID, "map-test", testValue)
-	defer cleanup()
-
-	// retrieve a nested value using keypath
-	value, err := Get(appID, "map-test/string")
-	testutil.AssertNoError(t, err, "get nested string")
-
-	strValue, ok := value.(string)
-	if !ok {
-		t.Fatalf("value is not a string: got %T", value)
-	}
-	if strValue != "hello" {
-		t.Fatalf("value does not match: expected 'hello', got '%s'", strValue)
-	}
-
-	// retrieve another nested value
-	value, err = Get(appID, "map-test/number")
-	testutil.AssertNoError(t, err, "get nested number")
-
-	numValue, ok := value.(int64)
-	if !ok {
-		t.Fatalf("value is not an int64: got %T", value)
-	}
-	if numValue != 42 {
-		t.Fatalf("value does not match: expected 42, got %d", numValue)
-	}
-
-	// error case: non-existent key in path
-	_, err = Get(appID, "map-test/nonexistent")
-	testutil.AssertError(t, err, "non-existent key in path")
-
-	// retrieve the whole map without keypath (backward compatibility)
-	value, err = Get(appID, "map-test")
-	testutil.AssertNoError(t, err, "get whole map")
-
-	if !reflect.DeepEqual(value, testValue) {
-		t.Fatalf("map does not match: expected %v, got %v", testValue, value)
 	}
 }
 
@@ -130,7 +79,8 @@ func TestGetFloat(t *testing.T) {
 
 	value, err := GetFloat(appID, "float-test")
 	testutil.AssertNoError(t, err, "GetFloat")
-	if math.Abs(value-testValue) > 1e-10 {
+
+	if !testutil.ValuesEqualApprox(testValue, value) {
 		t.Fatalf("expected %f, got %f", testValue, value)
 	}
 }
@@ -255,30 +205,97 @@ func TestGetMissingKey(t *testing.T) {
 	testutil.AssertError(t, err, "missing key")
 }
 
-func TestGetEmptyKeypath(t *testing.T) {
+func TestGetEmptyKeyName(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Test empty keypath
+	// Test empty key name
 	_, err := Get(appID, "")
-	testutil.AssertError(t, err, "empty keypath")
+	testutil.AssertError(t, err, "empty key name")
 }
 
-func TestGetKeypathOnlySlashes(t *testing.T) {
+func TestQuery(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Test keypath with only slashes
-	_, err := Get(appID, "///")
-	testutil.AssertError(t, err, "keypath with only slashes")
-}
+	testData := map[string]any{
+		"name": "Jane Doe",
+		"age":  30,
+		"city": "Anytown",
+		"items": []any{
+			"first",
+			"second",
+			"third",
+		},
+		"pets": []any{
+			map[string]any{
+				"name": "Fluffy",
+				"type": "dog",
+			},
+			map[string]any{
+				"name": "Whiskers",
+				"type": "cat",
+			},
+		},
+	}
 
-func TestGetKeypathNonDictSegment(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Set a simple string value
-	cleanup := setupTest(t, appID, "simple-string", "hello")
+	cleanup := setupTest(t, appID, "bio", testData)
 	defer cleanup()
 
-	// Try to traverse through it as if it were a dictionary
-	_, err := Get(appID, "simple-string/nested")
-	testutil.AssertError(t, err, "traversing non-dict segment")
+	t.Run("Simple field access", func(t *testing.T) {
+		value, err := GetQ(appID, "bio", "$.name")
+		testutil.AssertNoError(t, err, "get user name")
+		if value != "Jane Doe" {
+			t.Errorf("expected 'Jane Doe', got %v", value)
+		}
+	})
+
+	t.Run("Numeric field access", func(t *testing.T) {
+		value, err := GetQ(appID, "bio", "$.age")
+		testutil.AssertNoError(t, err, "get user age")
+		if !testutil.ValuesEqualApprox(int64(30), value) {
+			t.Fatalf("expected 30, got %v", value)
+		}
+	})
+
+	t.Run("Root object access", func(t *testing.T) {
+		value, err := GetQ(appID, "bio", "$")
+		testutil.AssertNoError(t, err, "get root object")
+		if !testutil.ValuesEqualApprox(testData, value) {
+			t.Fatalf("expected %v, got %v", testData, value)
+		}
+	})
+
+	t.Run("Array access", func(t *testing.T) {
+		value, err := GetQ(appID, "bio", "$.items[0]")
+		testutil.AssertNoError(t, err, "get first item")
+		if value != "first" {
+			t.Fatalf("expected 'first', got %v", value)
+		}
+	})
+
+	t.Run("Nested array access", func(t *testing.T) {
+		value, err := GetQ(appID, "bio", "$.pets[0].name")
+		testutil.AssertNoError(t, err, "get first pet name")
+		if value != "Fluffy" {
+			t.Fatalf("expected 'Fluffy', got %v", value)
+		}
+	})
+}
+
+func TestGetQueryErrors(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	t.Run("Non-existent field", func(t *testing.T) {
+		_, err := GetQ(appID, "userData", "$.nonexistent")
+		testutil.AssertError(t, err, "non-existent field should return error")
+	})
+
+	t.Run("Non-existent root key", func(t *testing.T) {
+		_, err := GetQ(appID, "nonexistent", "$.name")
+		testutil.AssertError(t, err, "non-existent root key should return error")
+	})
+
+	t.Run("Invalid JSONPath", func(t *testing.T) {
+		_, err := GetQ(appID, "userData", "$.name[invalid")
+		testutil.AssertError(t, err, "invalid JSONPath should return error")
+	})
 }

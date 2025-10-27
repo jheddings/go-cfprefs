@@ -20,29 +20,31 @@ var (
 
 var writeCmd = &cobra.Command{
 	Use:   "write <appID> <key> <value>",
-	Short: "Write a preference value (supports keypaths with '/' separator)",
+	Short: "Write a preference value",
 	Long: `Write a preference value for the specified application ID.
 
-The key may be a keypath separated by forward slashes ("/") to set values in
-nested dictionaries. For example, "settings/display/brightness" will set the
-"brightness" value in the nested structure, creating intermediate dictionaries
-as needed.`,
+Use the --query flag to apply JSONPath queries for more precise value setting
+within complex nested structures.`,
 	Args: cobra.ExactArgs(3),
 	Run:  doWriteCmd,
 }
 
 func init() {
-	writeCmd.Flags().BoolVar(&writeTypeStr, "string", false, "Parse value as string (default)")
-	writeCmd.Flags().BoolVar(&writeTypeInt, "int", false, "Parse value as integer")
-	writeCmd.Flags().BoolVar(&writeTypeFloat, "float", false, "Parse value as float")
-	writeCmd.Flags().BoolVar(&writeTypeBool, "bool", false, "Parse value as boolean")
-	writeCmd.Flags().BoolVar(&writeTypeDate, "date", false, "Parse value as date (ISO 8601 format)")
+	flags := writeCmd.Flags()
+
+	flags.BoolVar(&writeTypeStr, "string", false, "Parse value as string (default)")
+	flags.BoolVar(&writeTypeInt, "int", false, "Parse value as integer")
+	flags.BoolVar(&writeTypeFloat, "float", false, "Parse value as float")
+	flags.BoolVar(&writeTypeBool, "bool", false, "Parse value as boolean")
+	flags.BoolVar(&writeTypeDate, "date", false, "Parse value as date (ISO 8601 format)")
+	flags.StringP("query", "Q", "", "Apply JSONPath query for precise value setting")
 
 	rootCmd.AddCommand(writeCmd)
 }
 
 func doWriteCmd(cmd *cobra.Command, args []string) {
 	appID, key, valueStr := args[0], args[1], args[2]
+	query, _ := cmd.Flags().GetString("query")
 
 	// make sure only one type flag is set
 	typeCount := 0
@@ -66,9 +68,22 @@ func doWriteCmd(cmd *cobra.Command, args []string) {
 	}
 
 	value := parseValue(valueStr)
-	log.Trace().Str("appID", appID).Str("key", key).Any("value", value).Type("type", value).Msg("Writing preference")
 
-	err := cfprefs.Set(appID, key, value)
+	log.Trace().
+		Str("appID", appID).
+		Str("key", key).
+		Str("query", query).
+		Any("value", value).
+		Type("type", value).
+		Msg("Writing preference")
+
+	var err error
+	if query == "" {
+		err = cfprefs.Set(appID, key, value)
+	} else {
+		err = cfprefs.SetQ(appID, key, query, value)
+	}
+
 	if err == nil {
 		log.Info().Str("app", appID).Str("key", key).Any("value", value).Msg("Value saved successfully")
 	} else {

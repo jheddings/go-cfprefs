@@ -21,6 +21,9 @@ var (
 
 	// ErrCFMemory is returned when CF memory operations fail
 	ErrCFMemory = errors.New("CoreFoundation memory error")
+
+	// ErrCFLookup is returned when a preference lookup fails
+	ErrCFLookup = errors.New("CoreFoundation lookup error")
 )
 
 // CFErr represents a generic CoreFoundation error with context
@@ -101,6 +104,10 @@ func (e *CFErr) Is(target error) bool {
 		if target == ErrCFMemory {
 			return true
 		}
+	case "lookup":
+		if target == ErrCFLookup {
+			return true
+		}
 	}
 
 	return target == ErrCFOperation || target == e.Err
@@ -109,6 +116,11 @@ func (e *CFErr) Is(target error) bool {
 // CFRefError creates a new reference error
 func CFRefError() *CFErr {
 	return &CFErr{Op: "reference", Err: ErrCFReference}
+}
+
+// CFLookupError creates a new lookup error
+func CFLookupError() *CFErr {
+	return &CFErr{Op: "lookup", Err: ErrCFLookup}
 }
 
 // CFTypeError creates a new type conversion error
