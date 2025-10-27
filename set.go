@@ -130,23 +130,23 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 		}
 
 		// validate array bounds
-		if index >= len(arr) {
+		if index < 0 || index >= len(arr) {
 			return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
 		}
 
+		// set the element at the index if this is the last segment
 		if isLast {
-			// set the element at the index
 			arr[index] = value
 			return arr, nil
 		}
 
-		// continue traversing
-		modified, err := walkOrSet(arr[idx], segments[1:], value)
+		// continue traversing the remaining segments
+		modified, err := walkOrSet(arr[index], segments[1:], value)
 		if err != nil {
 			return nil, err
 		}
 
-		arr[idx] = modified
+		arr[index] = modified
 		return arr, nil
 	}
 
@@ -166,7 +166,7 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 			return obj, nil
 		}
 
-		// get or create the child
+		// create the child if it doesn't exist
 		child, exists := obj[name]
 		if !exists {
 			// create new structure based on next segment
@@ -182,10 +182,12 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 			}
 		}
 
+		// continue traversing the remaining segments
 		modified, err := walkOrSet(child, segments[1:], value)
 		if err != nil {
 			return nil, err
 		}
+
 		obj[name] = modified
 		return obj, nil
 	}

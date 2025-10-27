@@ -21,7 +21,7 @@ var (
 // parseJSONPath parses a simple JSONPath expression into segments.
 // Supports: $.field, $.field.nested, $.field[0], $.array[0].field, $.array[]
 //
-// This function is a simplified version of the jsonpath.Parse function that
+// This function is a simplified version of the jsonpath.Parse function, which
 // adds support for append operations (empty array brackets []).
 func parseJSONPath(path string) ([]*spec.Segment, error) {
 	path = strings.TrimPrefix(path, "$")
