@@ -87,12 +87,12 @@ func deleteValueAtPath(data any, norm spec.NormalizedPath) (any, error) {
 	}
 
 	// recursively delete using the segments
-	return deleteFinalSegment(data, segments)
+	return walkDownOrDelete(data, segments)
 }
 
-// deleteFinalSegment recursively traverses the data structure and deletes the value
+// walkDownOrDelete recursively traverses the data structure and deletes the value
 // at the final segment of the path, returning the modified structure.
-func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
+func walkDownOrDelete(data any, segments []*spec.Segment) (any, error) {
 	if len(segments) == 0 {
 		return data, nil
 	}
@@ -124,7 +124,7 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 
 		} else {
 			// continue traversing the remaining segments
-			modified, err := deleteFinalSegment(arr[index], segments[1:])
+			modified, err := walkDownOrDelete(arr[index], segments[1:])
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at array index %d", index)
 			}
@@ -154,7 +154,7 @@ func deleteFinalSegment(data any, segments []*spec.Segment) (any, error) {
 
 		} else {
 			// continue traversing
-			modified, err := deleteFinalSegment(obj[key], segments[1:])
+			modified, err := walkDownOrDelete(obj[key], segments[1:])
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at key: %s", key)
 			}
