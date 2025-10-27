@@ -87,12 +87,12 @@ func deleteValueAtPath(data any, norm spec.NormalizedPath) (any, error) {
 	}
 
 	// recursively delete using the segments
-	return walkDownOrDelete(data, segments)
+	return walkOrDelete(data, segments)
 }
 
-// walkDownOrDelete recursively traverses the data structure and deletes the value
+// walkOrDelete recursively traverses the data structure and deletes the value
 // at the final segment of the path, returning the modified structure.
-func walkDownOrDelete(data any, segments []*spec.Segment) (any, error) {
+func walkOrDelete(data any, segments []*spec.Segment) (any, error) {
 	if len(segments) == 0 {
 		return data, nil
 	}
@@ -106,14 +106,14 @@ func walkDownOrDelete(data any, segments []*spec.Segment) (any, error) {
 	selector := selectors[0]
 	isLast := len(segments) == 1
 
-	// check if this is an index selector
-	if idx, ok := selector.(spec.Index); ok {
+	// check if this is an segment index selector (array access)
+	if seg, ok := selector.(spec.Index); ok {
 		arr, ok := data.([]any)
 		if !ok {
 			return nil, NewTypeMismatchError([]any{}, data)
 		}
 
-		index := int(idx)
+		index := int(seg)
 		if index < 0 || index >= len(arr) {
 			return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
 		}
@@ -124,7 +124,7 @@ func walkDownOrDelete(data any, segments []*spec.Segment) (any, error) {
 
 		} else {
 			// continue traversing the remaining segments
-			modified, err := walkDownOrDelete(arr[index], segments[1:])
+			modified, err := walkOrDelete(arr[index], segments[1:])
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at array index %d", index)
 			}
@@ -136,14 +136,14 @@ func walkDownOrDelete(data any, segments []*spec.Segment) (any, error) {
 		return arr, nil
 	}
 
-	// check if this is a name selector
-	if name, ok := selector.(spec.Name); ok {
+	// check if this is a segment name selector (field access)
+	if seg, ok := selector.(spec.Name); ok {
 		obj, ok := data.(map[string]any)
 		if !ok {
 			return nil, NewTypeMismatchError(map[string]any{}, data)
 		}
 
-		key := string(name)
+		key := string(seg)
 		if _, exists := obj[key]; !exists {
 			return nil, NewKeyNotFoundError("", key)
 		}
@@ -154,7 +154,7 @@ func walkDownOrDelete(data any, segments []*spec.Segment) (any, error) {
 
 		} else {
 			// continue traversing
-			modified, err := walkDownOrDelete(obj[key], segments[1:])
+			modified, err := walkOrDelete(obj[key], segments[1:])
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at key: %s", key)
 			}

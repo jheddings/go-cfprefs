@@ -51,7 +51,7 @@ func SetQ(appID, rootKey, query string, value any) error {
 	}
 
 	// set the value at the specified path
-	modified, err := setAtPath(rootValue, query, value)
+	modified, err := setValueAtPath(rootValue, query, value)
 	if err != nil {
 		return NewKeyPathError().Wrap(err).WithMsgF("failed to set at path '%s'", query)
 	}
@@ -60,9 +60,9 @@ func SetQ(appID, rootKey, query string, value any) error {
 	return internal.Set(appID, rootKey, modified)
 }
 
-// setAtPath sets a value at the given JSONPath in the data structure.
+// setValueAtPath sets a value at the given JSONPath in the data structure.
 // Returns the modified structure or an error if the path cannot be set.
-func setAtPath(data any, path string, value any) (any, error) {
+func setValueAtPath(data any, path string, value any) (any, error) {
 	segments, err := parseJSONPath(path)
 	if err != nil {
 		return nil, err
@@ -73,12 +73,12 @@ func setAtPath(data any, path string, value any) (any, error) {
 		return value, nil
 	}
 
-	return setSegments(data, segments, value)
+	return walkOrSet(data, segments, value)
 }
 
-// setSegments navigates to the target and sets the value, creating
+// walkOrSet navigates to the target and sets the value, creating
 // intermediate structures as needed.
-func setSegments(data any, segments []pathSegment, value any) (any, error) {
+func walkOrSet(data any, segments []pathSegment, value any) (any, error) {
 	if len(segments) == 0 {
 		return value, nil
 	}
@@ -108,7 +108,7 @@ func setSegments(data any, segments []pathSegment, value any) (any, error) {
 			}
 
 			// continue setting in the new element
-			modified, err := setSegments(newElement, segments[1:], value)
+			modified, err := walkOrSet(newElement, segments[1:], value)
 			if err != nil {
 				return nil, err
 			}
@@ -129,7 +129,7 @@ func setSegments(data any, segments []pathSegment, value any) (any, error) {
 		}
 
 		// continue traversing
-		modified, err := setSegments(arr[segment.index], segments[1:], value)
+		modified, err := walkOrSet(arr[segment.index], segments[1:], value)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +160,7 @@ func setSegments(data any, segments []pathSegment, value any) (any, error) {
 			}
 		}
 
-		modified, err := setSegments(child, segments[1:], value)
+		modified, err := walkOrSet(child, segments[1:], value)
 		if err != nil {
 			return nil, err
 		}
