@@ -14,9 +14,9 @@ func Delete(appID, key string) error {
 	return internal.Delete(appID, key)
 }
 
-// DeleteQ removes a value using JSONPath syntax within a specific root key.
-// The JSONPath query is applied to the value stored under the rootKey.
-// Currently supports simple queries that resolve to a single item.
+// DeleteQ removes values using JSONPath syntax within a specific root key.
+// If the query matches multiple nodes in the root key, all matched nodes
+// will be deleted.
 //
 // Example usage:
 //
