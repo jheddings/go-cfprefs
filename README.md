@@ -7,6 +7,7 @@ Go module wrapper for the `CFPreferences` API's in macOS.
 - Read and write macOS preferences using native Go types
 - Automatic type conversion between Go types and CoreFoundation types
 - Support for all common data types: strings, numbers, booleans, dates, arrays, dictionaries, and binary data
+- Use JSONPath expressions to search complext structures
 
 ## Installation
 
@@ -73,7 +74,7 @@ err := cfprefs.Delete("com.example.app", "username")
 exists, err := cfprefs.Exists("com.example.app", "username")
 ```
 
-## Using Keypaths
+## Query Expressions
 
 TODO - document usage
 

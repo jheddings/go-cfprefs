@@ -16,7 +16,7 @@ The binary will be created in the `dist/` directory.
 
 ### `read` - Read preference values
 
-Read preference values from CFPreferences, with support for keypaths and JSONPath queries.
+Read preference values from CFPreferences, with support for JSONPath queries.
 
 #### Basic Usage
 
@@ -26,12 +26,9 @@ cfprefs read com.example.app
 
 # Read a specific key
 cfprefs read com.example.app username
-
-# Read a nested value using keypath
-cfprefs read com.example.app settings/display/brightness
 ```
 
-#### JSONPath Query Usage
+#### Query Usage
 
 ```bash
 # Read a nested field using JSONPath
@@ -49,16 +46,13 @@ cfprefs read com.example.app data --query '$.items[0]'
 
 ### `write` - Write preference values
 
-Write preference values to CFPreferences, with support for keypaths and JSONPath queries.
+Write preference values to CFPreferences, with support for JSONPath queries.
 
 #### Basic Usage
 
 ```bash
 # Write a string value
 cfprefs write com.example.app username "john_doe"
-
-# Write a nested value using keypath
-cfprefs write com.example.app settings/display/brightness "75"
 
 # Write with type specification
 cfprefs write com.example.app maxConnections "10" --int
@@ -92,16 +86,13 @@ cfprefs write com.example.app config --query '$.database.host' "localhost"
 
 ### `delete` - Delete preference keys
 
-Delete preference keys from CFPreferences, with support for keypaths and JSONPath queries.
+Delete preference keys from CFPreferences, with support for JSONPath queries.
 
 #### Basic Usage
 
 ```bash
 # Delete a specific key
 cfprefs delete com.example.app username
-
-# Delete a nested key using keypath
-cfprefs delete com.example.app settings/display/brightness
 ```
 
 #### JSONPath Query Usage

@@ -205,12 +205,12 @@ func TestGetMissingKey(t *testing.T) {
 	testutil.AssertError(t, err, "missing key")
 }
 
-func TestGetEmptyKeypath(t *testing.T) {
+func TestGetEmptyKeyName(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
-	// Test empty keypath
+	// Test empty key name
 	_, err := Get(appID, "")
-	testutil.AssertError(t, err, "empty keypath")
+	testutil.AssertError(t, err, "empty key name")
 }
 
 func TestQuery(t *testing.T) {
