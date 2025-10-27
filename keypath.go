@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/theory/jsonpath/spec"
 )
 
 var (
@@ -16,43 +18,41 @@ var (
 	ErrInvalidJSONPath = errors.New("invalid JSONPath expression")
 )
 
-// pathSegment represents a single segment in a JSONPath
-type pathSegment struct {
-	field      string // field name for object access
-	index      int    // index for array access
-	isArrayIdx bool   // true if this is an array index access
-}
-
 // parseJSONPath parses a simple JSONPath expression into segments.
 // Supports: $.field, $.field.nested, $.field[0], $.array[0].field, $.array[]
-func parseJSONPath(path string) ([]pathSegment, error) {
+//
+// This function is a simplified version of the jsonpath.Parse function that
+// adds support for append operations (empty array brackets []).
+func parseJSONPath(path string) ([]*spec.Segment, error) {
 	path = strings.TrimPrefix(path, "$")
 	path = strings.TrimPrefix(path, ".")
 
 	if path == "" {
-		return []pathSegment{}, nil
+		return []*spec.Segment{}, nil
 	}
 
 	// match field names, array indices, and empty array brackets
 	re := regexp.MustCompile(`([^.\[\]]+)|\[(\d*)\]`)
 	matches := re.FindAllStringSubmatch(path, -1)
 
-	var segments []pathSegment
+	var segments []*spec.Segment
 	for _, match := range matches {
+		var selector spec.Selector
 		if match[1] != "" {
 			// field access
-			segments = append(segments, pathSegment{field: match[1], isArrayIdx: false})
+			selector = spec.Name(match[1])
 		} else if match[0] == "[]" {
 			// empty array brackets - append operation
-			segments = append(segments, pathSegment{index: -1, isArrayIdx: true})
+			selector = spec.Index(-1)
 		} else if match[2] != "" {
 			// array index access
 			idx, err := strconv.Atoi(match[2])
 			if err != nil {
 				return nil, fmt.Errorf("invalid array index: %s", match[2])
 			}
-			segments = append(segments, pathSegment{index: idx, isArrayIdx: true})
+			selector = spec.Index(idx)
 		}
+		segments = append(segments, spec.Child(selector))
 	}
 
 	if len(segments) == 0 {

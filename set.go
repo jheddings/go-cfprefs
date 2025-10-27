@@ -1,9 +1,8 @@
 package cfprefs
 
 import (
-	"fmt"
-
 	"github.com/jheddings/go-cfprefs/internal"
+	"github.com/theory/jsonpath/spec"
 )
 
 // Set writes a preference value for the given key and application ID.
@@ -76,33 +75,46 @@ func setValueAtPath(data any, path string, value any) (any, error) {
 	return walkOrSet(data, segments, value)
 }
 
-// walkOrSet navigates to the target and sets the value, creating
-// intermediate structures as needed.
-func walkOrSet(data any, segments []pathSegment, value any) (any, error) {
+// walkOrSet navigates to the target and sets the value, creating intermediate structures as needed.
+func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 	if len(segments) == 0 {
 		return value, nil
 	}
 
 	segment := segments[0]
+	selectors := segment.Selectors()
+	if len(selectors) != 1 {
+		return nil, NewInternalError().WithMsgF("expected single selector in segment, got %d", len(selectors))
+	}
+
+	selector := selectors[0]
 	isLast := len(segments) == 1
 
-	if segment.isArrayIdx {
-		// handle array index
+	// check if this is an segment index selector (array access)
+	if idx, ok := selector.(spec.Index); ok {
+		index := int(idx)
+
+		// make sure the data in this segment is an array
 		arr, ok := data.([]any)
 		if !ok {
-			return nil, fmt.Errorf("expected array but got %T", data)
+			return nil, NewTypeMismatchError([]any{}, data)
 		}
 
 		// check for append operation (empty index)
-		if segment.index == -1 {
+		if index == -1 {
 			if isLast {
-				// append to array
 				return append(arr, value), nil
 			}
+
 			// append in the middle of path - create new element
 			var newElement any
-			if len(segments) > 1 && segments[1].isArrayIdx {
-				newElement = []any{}
+			if len(segments) > 1 {
+				nextSelector := segments[1].Selectors()[0]
+				if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
+					newElement = []any{}
+				} else {
+					newElement = make(map[string]any)
+				}
 			} else {
 				newElement = make(map[string]any)
 			}
@@ -118,43 +130,53 @@ func walkOrSet(data any, segments []pathSegment, value any) (any, error) {
 		}
 
 		// validate array bounds
-		if segment.index < 0 || segment.index >= len(arr) {
-			return nil, fmt.Errorf("array index out of bounds: %d", segment.index)
+		if index >= len(arr) {
+			return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
 		}
 
 		if isLast {
 			// set the element at the index
-			arr[segment.index] = value
+			arr[index] = value
 			return arr, nil
 		}
 
 		// continue traversing
-		modified, err := walkOrSet(arr[segment.index], segments[1:], value)
+		modified, err := walkOrSet(arr[idx], segments[1:], value)
 		if err != nil {
 			return nil, err
 		}
-		arr[segment.index] = modified
+
+		arr[idx] = modified
 		return arr, nil
-	} else {
-		// handle field access
+	}
+
+	// handle field access
+	if field, ok := selector.(spec.Name); ok {
+		name := string(field)
+
+		// make sure the data in this segment is a map
 		obj, ok := data.(map[string]any)
 		if !ok {
-			// if not a map, we can't set a field on it
-			return nil, fmt.Errorf("expected object but got %T", data)
+			return nil, NewTypeMismatchError(map[string]any{}, data)
 		}
 
+		// set the field if this is the last segment
 		if isLast {
-			// set the field
-			obj[segment.field] = value
+			obj[name] = value
 			return obj, nil
 		}
 
 		// get or create the child
-		child, exists := obj[segment.field]
+		child, exists := obj[name]
 		if !exists {
 			// create new structure based on next segment
-			if len(segments) > 1 && segments[1].isArrayIdx {
-				child = []any{}
+			if len(segments) > 1 {
+				nextSelector := segments[1].Selectors()[0]
+				if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
+					child = []any{}
+				} else {
+					child = make(map[string]any)
+				}
 			} else {
 				child = make(map[string]any)
 			}
@@ -164,7 +186,9 @@ func walkOrSet(data any, segments []pathSegment, value any) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		obj[segment.field] = modified
+		obj[name] = modified
 		return obj, nil
 	}
+
+	return nil, NewInternalError().WithMsgF("unsupported selector type for setting: %T", selector)
 }
