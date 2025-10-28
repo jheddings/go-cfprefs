@@ -1,6 +1,7 @@
 package cfprefs
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/jheddings/go-cfprefs/testutil"
@@ -182,14 +183,23 @@ func TestSetQArrayOperations(t *testing.T) {
 
 	items, err = GetSliceQ(appID, "array-test", "$.pets")
 	testutil.AssertNoError(t, err, "get array after append")
-	if len(items) != 2 {
-		t.Fatalf("array length incorrect: expected 2, got %d", len(items))
+
+	if !reflect.DeepEqual(items, []any{map[string]any{"name": "Fido"}, map[string]any{"name": "Spot"}}) {
+		t.Fatalf("array does not match expected: found %v", items)
 	}
-	if items[0].(map[string]any)["name"].(string) != "Fido" {
-		t.Fatalf("appended value incorrect: expected 'Fido', got '%s'", items[0].(map[string]any)["name"].(string))
-	}
-	if items[1].(map[string]any)["name"].(string) != "Spot" {
-		t.Fatalf("appended value incorrect: expected 'Spot', got '%s'", items[1].(map[string]any)["name"].(string))
+
+	// test appending to a new array
+	err = SetQ(appID, "array-test", "$.deep-array[].children[]", "child-1")
+	testutil.AssertNoError(t, err, "append to new array")
+
+	err = SetQ(appID, "array-test", "$.deep-array[0].children[]", "child-2")
+	testutil.AssertNoError(t, err, "append child to new array")
+
+	// NOTE: the brackets are required when querying names with dashes
+	items, err = GetSliceQ(appID, "array-test", "$['deep-array']")
+	testutil.AssertNoError(t, err, "get deep-array")
+	if !reflect.DeepEqual(items, []any{map[string]any{"children": []any{"child-1", "child-2"}}}) {
+		t.Fatalf("array does not match expected: found %v", items)
 	}
 
 	// Test array index out of bounds

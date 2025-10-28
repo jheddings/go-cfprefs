@@ -93,15 +93,12 @@ func deleteValueAtPath(data any, norm spec.NormalizedPath) (any, error) {
 // walkOrDelete recursively traverses the data structure and deletes the value
 // at the final segment of the path, returning the modified structure.
 func walkOrDelete(data any, segments []*spec.Segment) (any, error) {
-	if len(segments) == 0 {
-		return data, nil
-	}
-
 	arrayHandler := arraySegmentHandler{
 		onLast: func(arr []any, index int) ([]any, error) {
 			if index < 0 || index >= len(arr) {
 				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
 			}
+
 			// delete the element at this index
 			return append(arr[:index], arr[index+1:]...), nil
 		},
@@ -112,13 +109,13 @@ func walkOrDelete(data any, segments []*spec.Segment) (any, error) {
 				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
 			}
 
-			// continue traversing the element
+			// recursively delete in the element
 			modified, err := walkOrDelete(element, segments)
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at array index %d", index)
 			}
 
-			// update the array in place
+			// update the array with modified element
 			arr[index] = modified
 			return arr, nil
 		},
@@ -126,9 +123,11 @@ func walkOrDelete(data any, segments []*spec.Segment) (any, error) {
 
 	mapHandler := mapSegmentHandler{
 		onLast: func(obj map[string]any, key string) (map[string]any, error) {
+			// verify key exists
 			if _, exists := obj[key]; !exists {
 				return nil, NewKeyNotFoundError("", key)
 			}
+
 			// delete the key from the map
 			delete(obj, key)
 			return obj, nil
@@ -140,13 +139,13 @@ func walkOrDelete(data any, segments []*spec.Segment) (any, error) {
 				return nil, NewKeyNotFoundError("", key)
 			}
 
-			// continue traversing the child
+			// recursively delete in the child
 			modified, err := walkOrDelete(child, segments)
 			if err != nil {
 				return nil, NewInternalError().Wrap(err).WithMsgF("failed to delete at key: %s", key)
 			}
 
-			// update the map in place
+			// update the map with modified child
 			obj[key] = modified
 			return obj, nil
 		},

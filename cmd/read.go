@@ -10,7 +10,7 @@ import (
 )
 
 var readCmd = &cobra.Command{
-	Use:   "read <appID> <key>",
+	Use:   "read <appID> [<key>]",
 	Short: "Read a preference value",
 	Long: `Read a preference value for the specified application ID.
 

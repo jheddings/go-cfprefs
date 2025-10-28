@@ -77,13 +77,9 @@ func setValueAtPath(data any, path string, value any) (any, error) {
 
 // walkOrSet navigates to the target and sets the value, creating intermediate structures as needed.
 func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
-	if len(segments) == 0 {
-		return value, nil
-	}
-
 	arrayHandler := arraySegmentHandler{
 		onLast: func(arr []any, index int) ([]any, error) {
-			// check for append operation (empty index)
+			// handle append operation (empty index)
 			if index == -1 {
 				return append(arr, value), nil
 			}
@@ -99,25 +95,15 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 		},
 
 		onContinue: func(arr []any, index int, element any, segments []*spec.Segment) ([]any, error) {
-			// check for append operation (empty index)
+			// handle append operation (empty index)
 			if index == -1 {
-				// append in the middle of path - create new element based on next segment
-				var newElement any
-				if len(segments) > 0 {
-					nextSelector := segments[0].Selectors()[0]
-					if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
-						newElement = []any{}
-					} else {
-						newElement = make(map[string]any)
-					}
-				} else {
-					newElement = make(map[string]any)
-				}
+				// create new element based on next segment type
+				newElement := createStructureForSegment(segments)
 
-				// continue setting in the new element
+				// recursively set value in the new element
 				modified, err := walkOrSet(newElement, segments, value)
 				if err != nil {
-					return nil, err
+					return nil, NewInternalError().Wrap(err).WithMsg("failed to set in new array element")
 				}
 
 				// append the modified element to the array
@@ -129,12 +115,13 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
 			}
 
-			// continue traversing the existing element
+			// recursively set value in the existing element
 			modified, err := walkOrSet(element, segments, value)
 			if err != nil {
-				return nil, err
+				return nil, NewInternalError().Wrap(err).WithMsgF("failed to set at array index %d", index)
 			}
 
+			// update the array with modified element
 			arr[index] = modified
 			return arr, nil
 		},
@@ -142,36 +129,41 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 
 	mapHandler := mapSegmentHandler{
 		onLast: func(obj map[string]any, key string) (map[string]any, error) {
+			// set the value at the key
 			obj[key] = value
 			return obj, nil
 		},
 
 		onContinue: func(obj map[string]any, key string, child any, segments []*spec.Segment) (map[string]any, error) {
-			// if child is nil, create it based on the next segment
+			// create child structure if it doesn't exist
 			if child == nil {
-				// create new structure based on next segment
-				if len(segments) > 0 {
-					nextSelector := segments[0].Selectors()[0]
-					if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
-						child = []any{}
-					} else {
-						child = make(map[string]any)
-					}
-				} else {
-					child = make(map[string]any)
-				}
+				child = createStructureForSegment(segments)
 			}
 
-			// continue traversing with the child
+			// recursively set value in the child
 			modified, err := walkOrSet(child, segments, value)
 			if err != nil {
-				return nil, err
+				return nil, NewInternalError().Wrap(err).WithMsgF("failed to set at key: %s", key)
 			}
 
+			// update the map with modified child
 			obj[key] = modified
 			return obj, nil
 		},
 	}
 
 	return newPathWalker().WithHandler(&arrayHandler).WithHandler(&mapHandler).Walk(data, segments)
+}
+
+// createStructureForSegment creates an empty array or map based on the next segment type.
+// Returns an array if the next segment is an array index, otherwise returns a map.
+func createStructureForSegment(segments []*spec.Segment) any {
+	if len(segments) > 0 {
+		nextSelector := segments[0].Selectors()[0]
+		if _, ok := nextSelector.(spec.Index); ok {
+			return []any{}
+		}
+	}
+
+	return make(map[string]any)
 }
