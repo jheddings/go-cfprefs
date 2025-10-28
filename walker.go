@@ -9,11 +9,13 @@ import (
 // arraySegmentHandler defines callbacks for handling array path walk operations.
 type arraySegmentHandler struct {
 	// onLast is called when reaching the last segment of an array path.
+	// The index parameter may be ArrayAppendIndex (-1) to indicate an append operation.
 	// Returns the modified array or an error.
 	onLast func(arr []any, index int) ([]any, error)
 
 	// onContinue is called when traversing an array path with more segments.
-	// It receives the current array element (or nil if out of bounds) and remaining segments.
+	// It receives the current array element (or nil if index is out of bounds) and remaining segments.
+	// The index parameter may be ArrayAppendIndex (-1) to indicate an append operation.
 	// Returns the modified array or an error.
 	onContinue func(arr []any, index int, element any, remaining []*spec.Segment) ([]any, error)
 }
@@ -35,6 +37,9 @@ type pathWalker struct {
 	mapHandler   *mapSegmentHandler
 }
 
+// newPathWalker creates a new pathWalker with optional handlers.
+// Handlers can be added during construction or via WithHandler later.
+// If no handlers are provided, the walker will return errors for unsupported selector types.
 func newPathWalker(handlers ...any) *pathWalker {
 	w := &pathWalker{}
 	for _, handler := range handlers {
@@ -43,6 +48,9 @@ func newPathWalker(handlers ...any) *pathWalker {
 	return w
 }
 
+// WithHandler registers a handler for array or map segments.
+// Accepts either arraySegmentHandler or mapSegmentHandler (by value or pointer).
+// This method enables fluent-style chaining.
 func (w *pathWalker) WithHandler(handler any) *pathWalker {
 	if arrayHandler, ok := handler.(*arraySegmentHandler); ok {
 		w.arrayHandler = arrayHandler
@@ -94,7 +102,7 @@ func (w *pathWalker) Walk(data any, segments []*spec.Segment) (any, error) {
 			element = arr[index]
 		}
 
-		// element is nil if index is out of bounds or special (like -1)
+		// element is nil if index is out of bounds or special (like ArrayAppendIndex)
 		return w.arrayHandler.onContinue(arr, index, element, segments[1:])
 	}
 

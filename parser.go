@@ -10,6 +10,13 @@ import (
 	"github.com/theory/jsonpath/spec"
 )
 
+const (
+	// ArrayAppendIndex is a special index value used to indicate an append operation.
+	// When used in a JSONPath expression with empty brackets (e.g., $.items[]),
+	// it signals that a new element should be appended to the array.
+	ArrayAppendIndex = -1
+)
+
 var (
 	// ErrInvalidJSONPath is returned when an invalid JSONPath is provided
 	ErrInvalidJSONPath = errors.New("invalid JSONPath expression")
@@ -40,7 +47,7 @@ func parseJSONPath(path string) ([]*spec.Segment, error) {
 			selector = spec.Name(match[1])
 		} else if match[0] == "[]" {
 			// empty array brackets - append operation
-			selector = spec.Index(-1)
+			selector = spec.Index(ArrayAppendIndex)
 		} else if match[2] != "" {
 			// array index access
 			idx, err := strconv.Atoi(match[2])

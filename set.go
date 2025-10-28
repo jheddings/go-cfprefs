@@ -80,13 +80,13 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 	arrayHandler := arraySegmentHandler{
 		onLast: func(arr []any, index int) ([]any, error) {
 			// handle append operation (empty index)
-			if index == -1 {
+			if index == ArrayAppendIndex {
 				return append(arr, value), nil
 			}
 
 			// validate array bounds
 			if index < 0 || index >= len(arr) {
-				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
+				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
 			}
 
 			// set the element at the index
@@ -96,7 +96,7 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 
 		onContinue: func(arr []any, index int, element any, segments []*spec.Segment) ([]any, error) {
 			// handle append operation (empty index)
-			if index == -1 {
+			if index == ArrayAppendIndex {
 				// create new element based on next segment type
 				newElement := createStructureForSegment(segments)
 
@@ -112,7 +112,7 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 
 			// validate bounds for normal indices
 			if index < 0 || index >= len(arr) {
-				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d", index)
+				return nil, NewKeyPathError().WithMsgF("array index out of bounds: %d (array length: %d)", index, len(arr))
 			}
 
 			// recursively set value in the existing element
