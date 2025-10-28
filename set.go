@@ -81,8 +81,8 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 		return value, nil
 	}
 
-	handler := walkHandler{
-		onArrayLast: func(arr []any, index int) ([]any, error) {
+	arrayHandler := arraySegmentHandler{
+		onLast: func(arr []any, index int) ([]any, error) {
 			// check for append operation (empty index)
 			if index == -1 {
 				return append(arr, value), nil
@@ -98,13 +98,13 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 			return arr, nil
 		},
 
-		onArrayContinue: func(arr []any, index int, element any, remaining []*spec.Segment) ([]any, error) {
+		onContinue: func(arr []any, index int, element any, segments []*spec.Segment) ([]any, error) {
 			// check for append operation (empty index)
 			if index == -1 {
 				// append in the middle of path - create new element based on next segment
 				var newElement any
-				if len(remaining) > 0 {
-					nextSelector := remaining[0].Selectors()[0]
+				if len(segments) > 0 {
+					nextSelector := segments[0].Selectors()[0]
 					if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
 						newElement = []any{}
 					} else {
@@ -115,7 +115,7 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 				}
 
 				// continue setting in the new element
-				modified, err := walkOrSet(newElement, remaining, value)
+				modified, err := walkOrSet(newElement, segments, value)
 				if err != nil {
 					return nil, err
 				}
@@ -130,7 +130,7 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 			}
 
 			// continue traversing the existing element
-			modified, err := walkOrSet(element, remaining, value)
+			modified, err := walkOrSet(element, segments, value)
 			if err != nil {
 				return nil, err
 			}
@@ -138,18 +138,20 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 			arr[index] = modified
 			return arr, nil
 		},
+	}
 
-		onMapLast: func(obj map[string]any, key string) (map[string]any, error) {
+	mapHandler := mapSegmentHandler{
+		onLast: func(obj map[string]any, key string) (map[string]any, error) {
 			obj[key] = value
 			return obj, nil
 		},
 
-		onMapContinue: func(obj map[string]any, key string, child any, remaining []*spec.Segment) (map[string]any, error) {
+		onContinue: func(obj map[string]any, key string, child any, segments []*spec.Segment) (map[string]any, error) {
 			// if child is nil, create it based on the next segment
 			if child == nil {
 				// create new structure based on next segment
-				if len(remaining) > 0 {
-					nextSelector := remaining[0].Selectors()[0]
+				if len(segments) > 0 {
+					nextSelector := segments[0].Selectors()[0]
 					if nextIdx, ok := nextSelector.(spec.Index); ok && int(nextIdx) == -1 {
 						child = []any{}
 					} else {
@@ -161,7 +163,7 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 			}
 
 			// continue traversing with the child
-			modified, err := walkOrSet(child, remaining, value)
+			modified, err := walkOrSet(child, segments, value)
 			if err != nil {
 				return nil, err
 			}
@@ -171,5 +173,5 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 		},
 	}
 
-	return walkPath(data, segments, handler)
+	return newPathWalker().withHandler(&arrayHandler).withHandler(&mapHandler).walk(data, segments)
 }
