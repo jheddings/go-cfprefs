@@ -34,7 +34,7 @@ build: cli
 
 
 .PHONY: cli
-build-cli: init
+cli: init
 	mkdir -p $(DISTDIR)
 	cd $(SRCDIR) && \
 	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
