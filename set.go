@@ -173,5 +173,5 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 		},
 	}
 
-	return newPathWalker().withHandler(&arrayHandler).withHandler(&mapHandler).walk(data, segments)
+	return newPathWalker().WithHandler(&arrayHandler).WithHandler(&mapHandler).Walk(data, segments)
 }
