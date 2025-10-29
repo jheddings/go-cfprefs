@@ -5,15 +5,18 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/theory/jsonpath/spec"
 )
 
-var (
-	// ErrEmptyKeypath is returned when an empty keypath is provided
-	ErrEmptyKeypath = errors.New("keypath cannot be empty")
+const (
+	// ArrayAppendIndex is a special index value used to indicate an append operation.
+	// When used in a JSONPath expression with empty brackets (e.g., $.items[]),
+	// it signals that a new element should be appended to the array.
+	ArrayAppendIndex = -1
+)
 
+var (
 	// ErrInvalidJSONPath is returned when an invalid JSONPath is provided
 	ErrInvalidJSONPath = errors.New("invalid JSONPath expression")
 )
@@ -24,9 +27,6 @@ var (
 // This function is a simplified version of the jsonpath.Parse function, which
 // adds support for append operations (empty array brackets []).
 func parseJSONPath(path string) ([]*spec.Segment, error) {
-	path = strings.TrimPrefix(path, "$")
-	path = strings.TrimPrefix(path, ".")
-
 	if path == "" {
 		return []*spec.Segment{}, nil
 	}
@@ -38,12 +38,15 @@ func parseJSONPath(path string) ([]*spec.Segment, error) {
 	var segments []*spec.Segment
 	for _, match := range matches {
 		var selector spec.Selector
-		if match[1] != "" {
-			// field access
-			selector = spec.Name(match[1])
+		if match[0] == "$" {
+			// root element - no selector
+			continue
 		} else if match[0] == "[]" {
 			// empty array brackets - append operation
-			selector = spec.Index(-1)
+			selector = spec.Index(ArrayAppendIndex)
+		} else if match[1] != "" {
+			// field access
+			selector = spec.Name(match[1])
 		} else if match[2] != "" {
 			// array index access
 			idx, err := strconv.Atoi(match[2])
