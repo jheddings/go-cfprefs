@@ -151,5 +151,5 @@ func walkOrDelete(data any, segments []*spec.Segment) (any, error) {
 		},
 	}
 
-	return newPathWalker().WithHandler(&arrayHandler).WithHandler(&mapHandler).Walk(data, segments)
+	return newPathWalker().withHandler(&arrayHandler).withHandler(&mapHandler).walk(data, segments)
 }

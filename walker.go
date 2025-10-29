@@ -43,15 +43,15 @@ type pathWalker struct {
 func newPathWalker(handlers ...any) *pathWalker {
 	w := &pathWalker{}
 	for _, handler := range handlers {
-		w.WithHandler(handler)
+		w.withHandler(handler)
 	}
 	return w
 }
 
-// WithHandler registers a handler for array or map segments.
+// withHandler registers a handler for array or map segments.
 // Accepts either arraySegmentHandler or mapSegmentHandler (by value or pointer).
 // This method enables fluent-style chaining.
-func (w *pathWalker) WithHandler(handler any) *pathWalker {
+func (w *pathWalker) withHandler(handler any) *pathWalker {
 	if arrayHandler, ok := handler.(*arraySegmentHandler); ok {
 		w.arrayHandler = arrayHandler
 	} else if arrayHandler, ok := handler.(arraySegmentHandler); ok {
@@ -67,8 +67,8 @@ func (w *pathWalker) WithHandler(handler any) *pathWalker {
 	return w
 }
 
-// Walk recursively traverses segments of a path and calls the appropriate handler.
-func (w *pathWalker) Walk(data any, segments []*spec.Segment) (any, error) {
+// walk recursively traverses segments of a path and calls the appropriate handler.
+func (w *pathWalker) walk(data any, segments []*spec.Segment) (any, error) {
 	if len(segments) == 0 {
 		return data, nil
 	}

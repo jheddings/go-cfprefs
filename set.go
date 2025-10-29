@@ -152,7 +152,7 @@ func walkOrSet(data any, segments []*spec.Segment, value any) (any, error) {
 		},
 	}
 
-	return newPathWalker().WithHandler(&arrayHandler).WithHandler(&mapHandler).Walk(data, segments)
+	return newPathWalker().withHandler(&arrayHandler).withHandler(&mapHandler).walk(data, segments)
 }
 
 // createStructureForSegment creates an empty array or map based on the next segment type.
