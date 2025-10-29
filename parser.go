@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/theory/jsonpath/spec"
 )
@@ -28,9 +27,6 @@ var (
 // This function is a simplified version of the jsonpath.Parse function, which
 // adds support for append operations (empty array brackets []).
 func parseJSONPath(path string) ([]*spec.Segment, error) {
-	path = strings.TrimPrefix(path, "$")
-	path = strings.TrimPrefix(path, ".")
-
 	if path == "" {
 		return []*spec.Segment{}, nil
 	}
@@ -42,12 +38,15 @@ func parseJSONPath(path string) ([]*spec.Segment, error) {
 	var segments []*spec.Segment
 	for _, match := range matches {
 		var selector spec.Selector
-		if match[1] != "" {
-			// field access
-			selector = spec.Name(match[1])
+		if match[0] == "$" {
+			// root element - no selector
+			continue
 		} else if match[0] == "[]" {
 			// empty array brackets - append operation
 			selector = spec.Index(ArrayAppendIndex)
+		} else if match[1] != "" {
+			// field access
+			selector = spec.Name(match[1])
 		} else if match[2] != "" {
 			// array index access
 			idx, err := strconv.Atoi(match[2])
