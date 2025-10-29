@@ -2,7 +2,6 @@ package cfprefs
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 
@@ -51,7 +50,7 @@ func parseJSONPath(path string) ([]*spec.Segment, error) {
 			// array index access
 			idx, err := strconv.Atoi(match[2])
 			if err != nil {
-				return nil, fmt.Errorf("invalid array index: %s", match[2])
+				return nil, NewKeyPathError().WithMsgF("invalid array index: %s", match[2])
 			}
 			selector = spec.Index(idx)
 		}
@@ -59,7 +58,7 @@ func parseJSONPath(path string) ([]*spec.Segment, error) {
 	}
 
 	if len(segments) == 0 {
-		return nil, fmt.Errorf("invalid JSONPath: %s", path)
+		return nil, NewKeyPathError().WithMsgF("invalid JSONPath: %s", path)
 	}
 
 	return segments, nil
