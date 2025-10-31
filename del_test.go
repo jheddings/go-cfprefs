@@ -40,7 +40,7 @@ func TestDeleteBasic(t *testing.T) {
 	assertKeyExists(t, appID, key, false)
 }
 
-func TestDeleteQ(t *testing.T) {
+func TestDeleteStructured(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	nestedData := map[string]any{

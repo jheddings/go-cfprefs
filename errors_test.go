@@ -179,7 +179,7 @@ func TestRealWorldErrors(t *testing.T) {
 		defer Delete(appID, "scalar-value")
 
 		// Try to set a nested field on a scalar
-		err = SetQ(appID, "scalar-value", "$.nested.field", "value")
+		err = Set(appID, "scalar-value/nested/field", "value")
 		testutil.AssertError(t, err, "setting through scalar")
 
 		// Should be a key path error
