@@ -79,35 +79,40 @@ func setValueAtPath(root any, tokens []string, value any) (any, error) {
 
 	handler := pathTokenHandler{
 		onArrayIndex: func(arr []any, index int, remaining []string) (any, error) {
+			// if this is the last token, set the value at the index
 			if len(remaining) == 0 {
 				arr[index] = value
 				return arr, nil
 			}
 
-			// recursively set in the element
-			modified, err := walker.walk(arr[index], remaining)
+			// continue to walk the path
+			data, err := walker.walk(arr[index], remaining)
 			if err != nil {
 				return nil, err
 			}
 
 			// update the array with any modifications
-			arr[index] = modified
+			arr[index] = data
 			return arr, nil
 		},
 		onArrayAppend: func(arr []any, remaining []string) (any, error) {
+			// if this is the last token, append the value to the array
 			if len(remaining) == 0 {
 				return append(arr, value), nil
 			}
 
-			// create a new element and continue setting
-			newElement := createStructureFor(remaining[0])
-			modified, err := walker.walk(newElement, remaining)
+			// construct the remaining path elements
+			new := createStructureFor(remaining[0])
+			data, err := walker.walk(new, remaining)
 			if err != nil {
 				return nil, err
 			}
-			return append(arr, modified), nil
+
+			// update the array with any modifications
+			return append(arr, data), nil
 		},
 		onObjectKey: func(obj map[string]any, key string, remaining []string) (any, error) {
+			// if this is the last token, set the value at the key
 			if len(remaining) == 0 {
 				obj[key] = value
 				return obj, nil
@@ -119,14 +124,14 @@ func setValueAtPath(root any, tokens []string, value any) (any, error) {
 				child = createStructureFor(remaining[0])
 			}
 
-			// recursively set in the child
-			modified, err := walker.walk(child, remaining)
+			// construct the remaining path elements
+			data, err := walker.walk(child, remaining)
 			if err != nil {
 				return nil, err
 			}
 
 			// update the object with any modifications
-			obj[key] = modified
+			obj[key] = data
 			return obj, nil
 		},
 		onMissingElement: func(token string) (any, error) {
