@@ -39,7 +39,7 @@ func Get(appID, keypath string) (any, error) {
 	}
 
 	// if there is no pointer, just return the value
-	if kp.Path == "" {
+	if kp.IsRoot() {
 		return val, nil
 	}
 

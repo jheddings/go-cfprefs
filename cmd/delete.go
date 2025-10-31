@@ -10,41 +10,34 @@ import (
 )
 
 var deleteCmd = &cobra.Command{
-	Use:   "delete <appID> <key>",
-	Short: "Delete a preference key",
-	Long: `Delete a preference key for the specified application ID.
+	Use:   "delete <appID> <keypath>",
+	Short: "Delete a preference value",
+	Long: `Delete a preference value for the specified application ID.
 
-Use the --query flag to apply JSONPath queries for more precise deletion within
-complex nested structures.`,
+The keypath can be a simple key name or include a JSON Pointer path 
+(e.g., "config/server/port") to delete nested values.`,
 	Args: cobra.ExactArgs(2),
 	Run:  doDeleteCmd,
 }
 
 func init() {
-	deleteCmd.Flags().StringP("query", "Q", "", "Apply JSONPath query for precise deletion")
 	rootCmd.AddCommand(deleteCmd)
 }
 
 func doDeleteCmd(cmd *cobra.Command, args []string) {
-	appID, key := args[0], args[1]
-	query, _ := cmd.Flags().GetString("query")
+	appID, keypath := args[0], args[1]
 
-	tuiConfirm(fmt.Sprintf("Delete %s [%s]", key, appID))
+	tuiConfirm(fmt.Sprintf("Delete %s [%s]", keypath, appID))
 
-	log.Trace().Str("app", appID).Str("key", key).Str("query", query).Msg("Deleting preference key")
+	log.Trace().Str("app", appID).Str("keypath", keypath).Msg("Deleting preference value")
 
-	var err error
-	if query == "" {
-		err = cfprefs.Delete(appID, key)
-	} else {
-		err = cfprefs.DeleteQ(appID, key, query)
-	}
+	err := cfprefs.Delete(appID, keypath)
 
 	if err == nil {
-		log.Info().Str("app", appID).Str("key", key).Msg("Key deleted successfully")
+		log.Info().Str("app", appID).Str("keypath", keypath).Msg("Value deleted successfully")
 	} else {
-		log.Fatal().Str("app", appID).Str("key", key).Err(err).Msg("Failed to delete key")
+		log.Fatal().Str("app", appID).Str("keypath", keypath).Err(err).Msg("Failed to delete value")
 	}
 
-	pterm.Success.Println("Key deleted")
+	pterm.Success.Println("Value deleted")
 }

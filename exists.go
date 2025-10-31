@@ -31,7 +31,7 @@ func Exists(appID, keypath string) (bool, error) {
 	}
 
 	// look for a quick exit
-	if !exists || kp.Path == "" {
+	if !exists || kp.IsRoot() {
 		return exists, nil
 	}
 

@@ -49,3 +49,8 @@ func parseKeypath(keypath string) (*keypath, error) {
 func (k *keypath) String() string {
 	return k.Key + k.Path
 }
+
+// IsRoot returns true if the keypath is a root keypath (empty pointer).
+func (k *keypath) IsRoot() bool {
+	return k.Path == "" || k.Path == "/"
+}
