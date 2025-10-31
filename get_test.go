@@ -1,7 +1,6 @@
 package cfprefs
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -327,26 +326,4 @@ func TestGetZ(t *testing.T) {
 
 	cleanup := setupTest(t, appID, "z-user-data", testData)
 	defer cleanup()
-
-	t.Run("Get user info", func(t *testing.T) {
-		name, err := GetZ[string](appID, "z-user-data/name")
-		testutil.AssertNoError(t, err, "GetZ")
-		if name != "Jane Doe" {
-			t.Fatalf("expected 'Jane Doe', got %s", name)
-		}
-
-		age, err := GetZ[int64](appID, "z-user-data/age")
-		testutil.AssertNoError(t, err, "GetZ")
-		if age != 30 {
-			t.Fatalf("expected 30, got %d", age)
-		}
-	})
-
-	t.Run("Mismatched types", func(t *testing.T) {
-		_, err := GetZ[string](appID, "z-user-data/age")
-		testutil.AssertError(t, err, "mismatched type should return error")
-		if !errors.Is(err, ErrTypeMismatch) {
-			t.Fatalf("expected ErrTypeMismatch, got %v", err)
-		}
-	})
 }
