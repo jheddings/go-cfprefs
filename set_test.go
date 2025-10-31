@@ -64,7 +64,7 @@ func TestSetQ(t *testing.T) {
 	testutil.AssertNoError(t, err, "set sibling branch")
 
 	// Verify the value was set correctly using GetQ
-	value, err := GetQ(appID, "nested-test", "$.level1.level1_1.value")
+	value, err := Get(appID, "nested-test/level1/level1_1/value")
 	testutil.AssertNoError(t, err, "get nested value")
 
 	strValue, ok := value.(string)
@@ -125,13 +125,13 @@ func TestSetQ(t *testing.T) {
 	testutil.AssertNoError(t, err, "set another value in existing path")
 
 	// Verify both values exist
-	value1, err := GetQ(appID, "nested-test", "$.level1.level1_1.value")
+	value1, err := Get(appID, "nested-test/level1/level1_1/value")
 	testutil.AssertNoError(t, err, "get first value")
 	if value1.(string) != "hello from nested path" {
 		t.Fatal("first value was modified when setting second value")
 	}
 
-	value2, err := GetQ(appID, "nested-test", "$.level1.level1_1.another")
+	value2, err := Get(appID, "nested-test/level1/level1_1/another")
 	testutil.AssertNoError(t, err, "get second value")
 	if value2.(int64) != 42 {
 		t.Fatalf("second value does not match: expected 42, got %d", value2.(int64))
@@ -155,7 +155,7 @@ func TestSetQArrayOperations(t *testing.T) {
 	err = SetQ(appID, "array-test", "$.items[1]", "updated-second")
 	testutil.AssertNoError(t, err, "update array element")
 
-	value, err := GetQ(appID, "array-test", "$.items[1]")
+	value, err := Get(appID, "array-test/items/1")
 	testutil.AssertNoError(t, err, "get updated array element")
 	if value.(string) != "updated-second" {
 		t.Fatalf("array element not updated: expected 'updated-second', got '%s'", value.(string))
@@ -165,7 +165,7 @@ func TestSetQArrayOperations(t *testing.T) {
 	err = SetQ(appID, "array-test", "$.items[]", "fourth")
 	testutil.AssertNoError(t, err, "append to array")
 
-	items, err := GetSliceQ(appID, "array-test", "$.items")
+	items, err := GetSlice(appID, "array-test/items")
 	testutil.AssertNoError(t, err, "get array after append")
 	if len(items) != 4 {
 		t.Fatalf("array length incorrect: expected 4, got %d", len(items))
@@ -181,7 +181,7 @@ func TestSetQArrayOperations(t *testing.T) {
 	err = SetQ(appID, "array-test", "$.pets[].name", "Spot")
 	testutil.AssertNoError(t, err, "append new element")
 
-	items, err = GetSliceQ(appID, "array-test", "$.pets")
+	items, err = GetSlice(appID, "array-test/pets")
 	testutil.AssertNoError(t, err, "get array after append")
 
 	if !reflect.DeepEqual(items, []any{map[string]any{"name": "Fido"}, map[string]any{"name": "Spot"}}) {
@@ -196,7 +196,7 @@ func TestSetQArrayOperations(t *testing.T) {
 	testutil.AssertNoError(t, err, "append child to new array")
 
 	// NOTE: the brackets are required when querying names with dashes
-	items, err = GetSliceQ(appID, "array-test", "$['deep-array']")
+	items, err = GetSlice(appID, "array-test/deep-array")
 	testutil.AssertNoError(t, err, "get deep-array")
 	if !reflect.DeepEqual(items, []any{map[string]any{"children": []any{"child-1", "child-2"}}}) {
 		t.Fatalf("array does not match expected: found %v", items)

@@ -1,6 +1,7 @@
 package cfprefs
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -241,7 +242,7 @@ func TestQuery(t *testing.T) {
 	defer cleanup()
 
 	t.Run("Simple field access", func(t *testing.T) {
-		value, err := GetQ(appID, "bio", "$.name")
+		value, err := Get(appID, "bio/name")
 		testutil.AssertNoError(t, err, "get user name")
 		if value != "Jane Doe" {
 			t.Errorf("expected 'Jane Doe', got %v", value)
@@ -249,7 +250,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Numeric field access", func(t *testing.T) {
-		value, err := GetQ(appID, "bio", "$.age")
+		value, err := Get(appID, "bio/age")
 		testutil.AssertNoError(t, err, "get user age")
 		if !testutil.ValuesEqualApprox(int64(30), value) {
 			t.Fatalf("expected 30, got %v", value)
@@ -257,7 +258,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Root object access", func(t *testing.T) {
-		value, err := GetQ(appID, "bio", "$")
+		value, err := Get(appID, "bio")
 		testutil.AssertNoError(t, err, "get root object")
 		if !testutil.ValuesEqualApprox(testData, value) {
 			t.Fatalf("expected %v, got %v", testData, value)
@@ -265,7 +266,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Array access", func(t *testing.T) {
-		value, err := GetQ(appID, "bio", "$.items[0]")
+		value, err := Get(appID, "bio/items/0")
 		testutil.AssertNoError(t, err, "get first item")
 		if value != "first" {
 			t.Fatalf("expected 'first', got %v", value)
@@ -273,7 +274,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Nested array access", func(t *testing.T) {
-		value, err := GetQ(appID, "bio", "$.pets[0].name")
+		value, err := Get(appID, "bio/pets/0/name")
 		testutil.AssertNoError(t, err, "get first pet name")
 		if value != "Fluffy" {
 			t.Fatalf("expected 'Fluffy', got %v", value)
@@ -285,17 +286,67 @@ func TestGetQueryErrors(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	t.Run("Non-existent field", func(t *testing.T) {
-		_, err := GetQ(appID, "userData", "$.nonexistent")
+		_, err := Get(appID, "userData/nonexistent")
 		testutil.AssertError(t, err, "non-existent field should return error")
 	})
 
 	t.Run("Non-existent root key", func(t *testing.T) {
-		_, err := GetQ(appID, "nonexistent", "$.name")
+		_, err := Get(appID, "nonexistent/name")
 		testutil.AssertError(t, err, "non-existent root key should return error")
 	})
 
 	t.Run("Invalid JSONPath", func(t *testing.T) {
-		_, err := GetQ(appID, "userData", "$.name[invalid")
+		_, err := Get(appID, "userData/name[0]")
 		testutil.AssertError(t, err, "invalid JSONPath should return error")
+	})
+}
+
+func TestGetZ(t *testing.T) {
+	appID := "com.jheddings.cfprefs.testing"
+
+	testData := map[string]any{
+		"name": "Jane Doe",
+		"age":  30,
+		"city": "Anytown",
+		"items": []any{
+			"first",
+			"second",
+			"third",
+		},
+		"pets": []any{
+			map[string]any{
+				"name": "Fluffy",
+				"type": "dog",
+			},
+			map[string]any{
+				"name": "Whiskers",
+				"type": "cat",
+			},
+		},
+	}
+
+	cleanup := setupTest(t, appID, "z-user-data", testData)
+	defer cleanup()
+
+	t.Run("Get user info", func(t *testing.T) {
+		name, err := GetZ[string](appID, "z-user-data/name")
+		testutil.AssertNoError(t, err, "GetZ")
+		if name != "Jane Doe" {
+			t.Fatalf("expected 'Jane Doe', got %s", name)
+		}
+
+		age, err := GetZ[int64](appID, "z-user-data/age")
+		testutil.AssertNoError(t, err, "GetZ")
+		if age != 30 {
+			t.Fatalf("expected 30, got %d", age)
+		}
+	})
+
+	t.Run("Mismatched types", func(t *testing.T) {
+		_, err := GetZ[string](appID, "z-user-data/age")
+		testutil.AssertError(t, err, "mismatched type should return error")
+		if !errors.Is(err, ErrTypeMismatch) {
+			t.Fatalf("expected ErrTypeMismatch, got %v", err)
+		}
 	})
 }

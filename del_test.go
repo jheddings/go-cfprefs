@@ -74,7 +74,7 @@ func TestDeleteQ(t *testing.T) {
 	}
 
 	// verify sibling value still exists (using bracket notation)
-	value, err := GetQ(appID, testKey, "$['level1']['value2']")
+	value, err := Get(appID, "deleteq-test/level1/value2")
 	testutil.AssertNoError(t, err, "get sibling value")
 	if value.(string) != "second value" {
 		t.Fatalf("sibling value was modified: expected 'second value', got '%s'", value.(string))
@@ -87,7 +87,7 @@ func TestDeleteQ(t *testing.T) {
 	}
 
 	// verify other branch still exists
-	value, err = GetQ(appID, testKey, "$.level2.nested")
+	value, err = Get(appID, "deleteq-test/level2/nested")
 	testutil.AssertNoError(t, err, "get other branch value")
 	if value.(int64) != int64(42) {
 		t.Fatalf("other branch was modified: expected 42, got %v", value)
@@ -114,7 +114,7 @@ func TestDeleteQArrayElement(t *testing.T) {
 	testutil.AssertNoError(t, err, "delete array element")
 
 	// verify the modified array
-	items, err := GetSliceQ(appID, testKey, "$.items")
+	items, err := Get(appID, "deleteq-array-test/items")
 	testutil.AssertNoError(t, err, "get items array after deletion")
 
 	expected := []any{
@@ -152,14 +152,14 @@ func TestDeleteQNestedInArray(t *testing.T) {
 	}
 
 	// verify the id field still exists
-	value, err := GetIntQ(appID, testKey, "$['items'][0]['id']")
+	value, err := GetInt(appID, "deleteq-nested-array-test/items/0/id")
 	testutil.AssertNoError(t, err, "get items[0].id")
 	if value != int64(1) {
 		t.Fatalf("items[0].id should be 1, got %v", value)
 	}
 
 	// verify the second item is unchanged
-	value2, err := GetStrQ(appID, testKey, "$['items'][1]['name']")
+	value2, err := GetStr(appID, "deleteq-nested-array-test/items/1/name")
 	testutil.AssertNoError(t, err, "get items[1].name")
 	if value2 != "second" {
 		t.Fatalf("items[1].name should be 'second', got '%s'", value2)
@@ -215,7 +215,7 @@ func TestDeleteQNonExistentPath(t *testing.T) {
 	err := DeleteQ(appID, testKey, "$.user.age")
 	testutil.AssertNoError(t, err, "delete non-existent path should be idempotent")
 
-	value, err := GetStrQ(appID, testKey, "$.user.name")
+	value, err := GetStr(appID, "deleteq-nonexistent-test/user/name")
 	testutil.AssertNoError(t, err, "get existing field")
 	if value != "John" {
 		t.Fatalf("existing field should be unchanged, got %v", value)
@@ -257,7 +257,7 @@ func TestDeleteMultipleValues(t *testing.T) {
 	err := DeleteQ(appID, testKey, "$.users[*].active")
 	testutil.AssertNoError(t, err, "delete multiple fields")
 
-	users, err := GetSliceQ(appID, testKey, "$.users")
+	users, err := GetSlice(appID, "deleteq-multiple-test/users")
 	testutil.AssertNoError(t, err, "get users")
 
 	expected := []any{
@@ -296,7 +296,7 @@ func TestDeleteMultipleArrayElements(t *testing.T) {
 	}
 
 	// verify remaining items
-	items, err := GetSliceQ(appID, testKey, "$.data.items")
+	items, err := GetSlice(appID, "deleteq-multiple-array-test/data/items")
 	testutil.AssertNoError(t, err, "get remaining items")
 
 	expected := []any{
@@ -338,7 +338,7 @@ func TestDeleteWildcardPaths(t *testing.T) {
 	testutil.AssertNoError(t, err, "delete with wildcard")
 
 	// verify all budget fields were deleted
-	departments, err := GetMapQ(appID, testKey, "$.departments")
+	departments, err := GetMap(appID, "deleteq-wildcard-test/departments")
 	testutil.AssertNoError(t, err, "get departments")
 
 	expected := map[string]any{

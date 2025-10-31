@@ -14,14 +14,13 @@ var readCmd = &cobra.Command{
 	Short: "Read a preference value",
 	Long: `Read a preference value for the specified application ID.
 
-Use the --query flag to apply JSONPath queries to the retrieved value. This allows
-for more sophisticated data extraction from complex nested structures.`,
+The key can be a simple name or include a JSON Pointer path (e.g., "config/server/port")
+to access nested values within the preference.`,
 	Args: cobra.MinimumNArgs(1),
 	Run:  doReadCmd,
 }
 
 func init() {
-	readCmd.Flags().StringP("query", "Q", "", "Apply JSONPath query to the retrieved value")
 	rootCmd.AddCommand(readCmd)
 }
 
@@ -56,18 +55,10 @@ func doReadKeysCmd(args []string) {
 
 func doReadValueCmd(cmd *cobra.Command, args []string) {
 	appID, key := args[0], args[1]
-	query, _ := cmd.Flags().GetString("query")
 
-	log.Trace().Str("app", appID).Str("key", key).Str("query", query).Msg("Reading preference")
+	log.Trace().Str("app", appID).Str("key", key).Msg("Reading preference")
 
-	var value any
-	var err error
-
-	if query == "" {
-		value, err = cfprefs.Get(appID, key)
-	} else {
-		value, err = cfprefs.GetQ(appID, key, query)
-	}
+	value, err := cfprefs.Get(appID, key)
 
 	if err == nil {
 		log.Info().Str("app", appID).Str("key", key).Type("type", value).Msg("Value read successfully")

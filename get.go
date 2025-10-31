@@ -1,10 +1,11 @@
 package cfprefs
 
 import (
+	"strings"
 	"time"
 
+	"github.com/go-openapi/jsonpointer"
 	"github.com/jheddings/go-cfprefs/internal"
-	"github.com/theory/jsonpath"
 )
 
 // GetKeys retrieves all keys for the given appID.
@@ -16,61 +17,56 @@ func GetKeys(appID string) ([]string, error) {
 // Get retrieves a preference value for the given key and application ID.
 // Returns the value at the specified path or an error if not found.
 func Get(appID, key string) (any, error) {
-	value, err := internal.Get(appID, key)
+	// look for a base key and optional pointer
+	parts := strings.SplitN(key, "/", 2)
+	pref := parts[0]
+
+	val, err := internal.Get(appID, pref)
+	if err != nil {
+		return nil, NewKeyNotFoundError(appID, pref).Wrap(err)
+	}
+
+	// if there is no pointer, just return the value
+	if len(parts) == 1 {
+		return val, nil
+	}
+
+	path := "/" + parts[1]
+	ptr, err := jsonpointer.New(path)
+	if err != nil {
+		return nil, NewKeyPathError().Wrap(err).WithMsgF("invalid pointer: %s", path)
+	}
+
+	result, _, err := ptr.Get(val)
 	if err != nil {
 		return nil, NewKeyNotFoundError(appID, key).Wrap(err)
 	}
 
-	return value, nil
+	return result, nil
 }
 
-// GetQ retrieves a value using JSONPath syntax within a specific root key.
-// The JSONPath query is applied to the value stored under the rootKey.
-// Returns the result of the JSONPath query or an error if not found.
-//
-// Example usage:
-//
-//	// Get a nested value: $.user.name
-//	value, err := GetQ("com.example.app", "userData", "$.user.name")
-//
-//	// Get all items in an array: $.items[*]
-//	items, err := GetQ("com.example.app", "data", "$.items[*]")
-//
-//	// Filter array items: $.items[?(@.active == true)]
-//	activeItems, err := GetQ("com.example.app", "data", "$.items[?(@.active == true)]")
-func GetQ(appID, rootKey, query string) (any, error) {
-	rootValue, err := internal.Get(appID, rootKey)
+// GetZ retrieves a preference value for the given key and application ID and converts it to the desired type.
+// Returns an error if the key doesn't exist or if the value is not of the given type.
+func GetZ[T any](appID, key string) (T, error) {
+	var zero T
+
+	value, err := Get(appID, key)
 	if err != nil {
-		return nil, NewKeyNotFoundError(appID, rootKey).Wrap(err)
+		return zero, err
 	}
 
-	if query == "" || query == "$" {
-		return rootValue, nil
+	typedValue, ok := value.(T)
+	if !ok {
+		return zero, NewTypeMismatchError(zero, value).WithKey(appID, key)
 	}
 
-	path, err := jsonpath.Parse(query)
-	if err != nil {
-		return nil, NewKeyPathError().Wrap(err).WithMsgF("invalid query: %s", query)
-	}
-
-	results := path.Select(rootValue)
-	if len(results) == 0 {
-		return nil, NewKeyNotFoundError(appID, rootKey).WithMsgF("no results for query: %s", query)
-	}
-
-	return results[0], nil
+	return typedValue, nil
 }
 
 // GetStr retrieves a string preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a string.
 func GetStr(appID, key string) (string, error) {
-	return GetStrQ(appID, key, "$")
-}
-
-// GetStrQ retrieves a string preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not a string.
-func GetStrQ(appID, key, query string) (string, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 
 	if err != nil {
 		return "", err
@@ -87,13 +83,7 @@ func GetStrQ(appID, key, query string) (string, error) {
 // GetBool retrieves a boolean preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a boolean.
 func GetBool(appID, key string) (bool, error) {
-	return GetBoolQ(appID, key, "$")
-}
-
-// GetBoolQ retrieves a boolean preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not a boolean.
-func GetBoolQ(appID, key, query string) (bool, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 	if err != nil {
 		return false, err
 	}
@@ -109,13 +99,7 @@ func GetBoolQ(appID, key, query string) (bool, error) {
 // GetInt retrieves an integer preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not an integer.
 func GetInt(appID, key string) (int64, error) {
-	return GetIntQ(appID, key, "$")
-}
-
-// GetIntQ retrieves an integer preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not an integer.
-func GetIntQ(appID, key, query string) (int64, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 	if err != nil {
 		return 0, err
 	}
@@ -131,13 +115,7 @@ func GetIntQ(appID, key, query string) (int64, error) {
 // GetFloat retrieves a float preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a float.
 func GetFloat(appID, key string) (float64, error) {
-	return GetFloatQ(appID, key, "$")
-}
-
-// GetFloatQ retrieves a float preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not a float.
-func GetFloatQ(appID, key, query string) (float64, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 	if err != nil {
 		return 0.0, err
 	}
@@ -153,13 +131,7 @@ func GetFloatQ(appID, key, query string) (float64, error) {
 // GetDate retrieves a time.Time preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a time.Time.
 func GetDate(appID, key string) (time.Time, error) {
-	return GetDateQ(appID, key, "$")
-}
-
-// GetDateQ retrieves a time.Time preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not a time.Time.
-func GetDateQ(appID, key, query string) (time.Time, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -175,13 +147,7 @@ func GetDateQ(appID, key, query string) (time.Time, error) {
 // GetData retrieves a []byte preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a []byte.
 func GetData(appID, key string) ([]byte, error) {
-	return GetDataQ(appID, key, "$")
-}
-
-// GetDataQ retrieves a []byte preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not a []byte.
-func GetDataQ(appID, key, query string) ([]byte, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 	if err != nil {
 		return nil, err
 	}
@@ -197,13 +163,7 @@ func GetDataQ(appID, key, query string) ([]byte, error) {
 // GetSlice retrieves a []any preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a []any.
 func GetSlice(appID, key string) ([]any, error) {
-	return GetSliceQ(appID, key, "$")
-}
-
-// GetSliceQ retrieves a []any preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not a []any.
-func GetSliceQ(appID, key, query string) ([]any, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 	if err != nil {
 		return nil, err
 	}
@@ -219,13 +179,7 @@ func GetSliceQ(appID, key, query string) ([]any, error) {
 // GetMap retrieves a map[string]any preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a map[string]any.
 func GetMap(appID, key string) (map[string]any, error) {
-	return GetMapQ(appID, key, "$")
-}
-
-// GetMapQ retrieves a map[string]any preference value for the given JSONPath query using an application ID and root key.
-// Returns an error if the query is invalid or if the value is not a map[string]any.
-func GetMapQ(appID, key, query string) (map[string]any, error) {
-	value, err := GetQ(appID, key, query)
+	value, err := Get(appID, key)
 	if err != nil {
 		return nil, err
 	}
