@@ -4,6 +4,7 @@ import (
 	"errors"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/theory/jsonpath/spec"
 )
@@ -19,6 +20,43 @@ var (
 	// ErrInvalidJSONPath is returned when an invalid JSONPath is provided
 	ErrInvalidJSONPath = errors.New("invalid JSONPath expression")
 )
+
+type keypath struct {
+	Key  string
+	Path string
+}
+
+func newKeypath(pref, path string) *keypath {
+	return &keypath{Key: pref, Path: path}
+}
+
+func parseKeypath(keypath string) (*keypath, error) {
+	if keypath == "" {
+		return nil, NewKeyPathError().WithMsg("invalid keypath; empty string")
+	}
+
+	if strings.HasPrefix(keypath, "/") {
+		return nil, NewKeyPathError().WithMsg("invalid keypath; empty pref")
+	}
+
+	parts := strings.SplitN(keypath, "/", 2)
+
+	if len(parts) < 2 {
+		return newKeypath(parts[0], ""), nil
+	}
+
+	path := parts[1]
+	if path != "" {
+		path = "/" + path
+	}
+
+	return newKeypath(parts[0], path), nil
+}
+
+// String returns the keypath as a string.
+func (k *keypath) String() string {
+	return k.Key + k.Path
+}
 
 // parseJSONPath parses a simple JSONPath expression into segments.
 // Supports: $.field, $.field.nested, $.field[0], $.array[0].field, $.array[]

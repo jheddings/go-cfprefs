@@ -58,7 +58,7 @@ func TestDeleteQ(t *testing.T) {
 	defer cleanup()
 
 	// basic check that the value exists (using bracket notation)
-	exists, _ := ExistsQ(appID, testKey, "$['level1']['value1']")
+	exists, _ := Exists(appID, "deleteq-test/level1/value1")
 	if !exists {
 		t.Fatal("value1 should exist before deletion")
 	}
@@ -68,7 +68,7 @@ func TestDeleteQ(t *testing.T) {
 	testutil.AssertNoError(t, err, "delete nested field")
 
 	// verify it was deleted (using dot notation)
-	exists, _ = ExistsQ(appID, testKey, "$.level1.value1")
+	exists, _ = Exists(appID, "deleteq-test/level1/value1")
 	if exists {
 		t.Fatal("value1 should not exist after deletion")
 	}
@@ -81,7 +81,7 @@ func TestDeleteQ(t *testing.T) {
 	}
 
 	// verify parent dictionary still exists
-	exists, _ = ExistsQ(appID, testKey, "$.level1")
+	exists, _ = Exists(appID, "deleteq-test/level1")
 	if !exists {
 		t.Fatal("parent level1 should still exist")
 	}
@@ -146,7 +146,7 @@ func TestDeleteQNestedInArray(t *testing.T) {
 	testutil.AssertNoError(t, err, "delete field from array element")
 
 	// verify the name field was deleted
-	exists, _ := ExistsQ(appID, testKey, "$['items'][0]['name']")
+	exists, _ := Exists(appID, "deleteq-nested-array-test/items/0/name")
 	if exists {
 		t.Fatal("items[0].name should not exist after deletion")
 	}

@@ -1,7 +1,6 @@
 package cfprefs
 
 import (
-	"strings"
 	"time"
 
 	"github.com/go-openapi/jsonpointer"
@@ -29,29 +28,29 @@ func GetKeys(appID string) ([]string, error) {
 //
 // Returns the value at the specified path or an error if not found.
 func Get(appID, keypath string) (any, error) {
-	// look for a base key and optional pointer
-	parts := strings.SplitN(keypath, "/", 2)
-	pref := parts[0]
-
-	val, err := internal.Get(appID, pref)
+	kp, err := parseKeypath(keypath)
 	if err != nil {
-		return nil, NewKeyNotFoundError(appID, pref).Wrap(err)
+		return nil, NewKeyPathError().Wrap(err).WithMsgF("invalid keypath: %s", keypath)
+	}
+
+	val, err := internal.Get(appID, kp.Key)
+	if err != nil {
+		return nil, NewKeyNotFoundError(appID, kp.Key).Wrap(err)
 	}
 
 	// if there is no pointer, just return the value
-	if len(parts) == 1 {
+	if kp.Path == "" {
 		return val, nil
 	}
 
-	path := "/" + parts[1]
-	ptr, err := jsonpointer.New(path)
+	ptr, err := jsonpointer.New(kp.Path)
 	if err != nil {
-		return nil, NewKeyPathError().Wrap(err).WithMsgF("invalid pointer: %s", path)
+		return nil, NewKeyPathError().Wrap(err).WithMsgF("invalid pointer: %s", kp.Path)
 	}
 
 	result, _, err := ptr.Get(val)
 	if err != nil {
-		return nil, NewKeyNotFoundError(appID, keypath).Wrap(err)
+		return nil, NewKeyNotFoundError(appID, kp.String()).Wrap(err)
 	}
 
 	return result, nil
