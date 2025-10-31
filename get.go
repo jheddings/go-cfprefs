@@ -91,128 +91,47 @@ func GetZ[T any](appID, keypath string) (T, error) {
 // GetStr retrieves a string preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a string.
 func GetStr(appID, keypath string) (string, error) {
-	value, err := Get(appID, keypath)
-
-	if err != nil {
-		return "", err
-	}
-
-	strValue, ok := value.(string)
-	if !ok {
-		return "", NewTypeMismatchError(string(""), value).WithKey(appID, keypath)
-	}
-
-	return strValue, nil
+	return GetZ[string](appID, keypath)
 }
 
 // GetBool retrieves a boolean preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a boolean.
 func GetBool(appID, keypath string) (bool, error) {
-	value, err := Get(appID, keypath)
-	if err != nil {
-		return false, err
-	}
-
-	boolValue, ok := value.(bool)
-	if !ok {
-		return false, NewTypeMismatchError(bool(false), value).WithKey(appID, keypath)
-	}
-
-	return boolValue, nil
+	return GetZ[bool](appID, keypath)
 }
 
 // GetInt retrieves an integer preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not an integer.
 func GetInt(appID, keypath string) (int64, error) {
-	value, err := Get(appID, keypath)
-	if err != nil {
-		return 0, err
-	}
-
-	intValue, ok := value.(int64)
-	if !ok {
-		return 0, NewTypeMismatchError(int64(0), value).WithKey(appID, keypath)
-	}
-
-	return intValue, nil
+	return GetZ[int64](appID, keypath)
 }
 
 // GetFloat retrieves a float preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a float.
 func GetFloat(appID, keypath string) (float64, error) {
-	value, err := Get(appID, keypath)
-	if err != nil {
-		return 0.0, err
-	}
-
-	floatValue, ok := value.(float64)
-	if !ok {
-		return 0.0, NewTypeMismatchError(float64(0.0), value).WithKey(appID, keypath)
-	}
-
-	return floatValue, nil
+	return GetZ[float64](appID, keypath)
 }
 
 // GetDate retrieves a time.Time preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a time.Time.
 func GetDate(appID, keypath string) (time.Time, error) {
-	value, err := Get(appID, keypath)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	dateValue, ok := value.(time.Time)
-	if !ok {
-		return time.Time{}, NewTypeMismatchError(time.Time{}, value).WithKey(appID, keypath)
-	}
-
-	return dateValue, nil
+	return GetZ[time.Time](appID, keypath)
 }
 
 // GetData retrieves a []byte preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a []byte.
 func GetData(appID, keypath string) ([]byte, error) {
-	value, err := Get(appID, keypath)
-	if err != nil {
-		return nil, err
-	}
-
-	dataValue, ok := value.([]byte)
-	if !ok {
-		return nil, NewTypeMismatchError([]byte{}, value).WithKey(appID, keypath)
-	}
-
-	return dataValue, nil
+	return GetZ[[]byte](appID, keypath)
 }
 
 // GetSlice retrieves a []any preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a []any.
 func GetSlice(appID, keypath string) ([]any, error) {
-	value, err := Get(appID, keypath)
-	if err != nil {
-		return nil, err
-	}
-
-	sliceValue, ok := value.([]any)
-	if !ok {
-		return nil, NewTypeMismatchError([]any{}, value).WithKey(appID, keypath)
-	}
-
-	return sliceValue, nil
+	return GetZ[[]any](appID, keypath)
 }
 
 // GetMap retrieves a map[string]any preference value for the given key and application ID.
 // Returns an error if the key doesn't exist or if the value is not a map[string]any.
 func GetMap(appID, keypath string) (map[string]any, error) {
-	value, err := Get(appID, keypath)
-	if err != nil {
-		return nil, err
-	}
-
-	mapValue, ok := value.(map[string]any)
-	if !ok {
-		return nil, NewTypeMismatchError(map[string]any{}, value).WithKey(appID, keypath)
-	}
-
-	return mapValue, nil
+	return GetZ[map[string]any](appID, keypath)
 }
