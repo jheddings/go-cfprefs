@@ -3,6 +3,7 @@ module github.com/jheddings/go-cfprefs
 go 1.25.3
 
 require (
+	github.com/go-openapi/jsonpointer v0.22.1
 	github.com/pterm/pterm v0.12.82
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
@@ -18,7 +19,6 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/containerd/console v1.0.5 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/go-openapi/jsonpointer v0.22.1 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gookit/color v1.6.0 // indirect
