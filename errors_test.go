@@ -101,7 +101,7 @@ func TestErrorChaining(t *testing.T) {
 }
 
 func TestRealWorldErrors(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing.errors"
+	appID := testAppID + ".errors"
 
 	t.Run("GetMissingKey", func(t *testing.T) {
 		// Ensure key doesn't exist

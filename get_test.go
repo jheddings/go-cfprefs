@@ -8,217 +8,172 @@ import (
 	"github.com/jheddings/go-cfprefs/testutil"
 )
 
-// setupTest sets a value and returns a cleanup function
-func setupTest(t *testing.T, appID, key string, value any) func() {
-	t.Helper()
-	err := Set(appID, key, value)
-
-	if err != nil {
-		t.Fatalf("failed to set test value: %v", err)
-	}
-
-	return func() {
-		if err := Delete(appID, key); err != nil {
-			t.Errorf("failed to cleanup test key: %v", err)
-		}
-	}
-}
-
-func TestGetStr(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	testValue := "hello"
-
-	cleanup := setupTest(t, appID, "str-test", testValue)
-	defer cleanup()
-
-	assertKeyExists(t, appID, "str-test", true)
-
-	// Type mismatch - should error
-	_, err := GetInt(appID, "str-test")
-	testutil.AssertError(t, err, "non-int value")
-
-	value, err := GetStr(appID, "str-test")
-	testutil.AssertNoError(t, err, "GetStr")
-	if value != testValue {
-		t.Fatalf("expected %s, got %s", testValue, value)
-	}
-}
-
-func TestGetInt(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	testValue := int64(42)
-
-	cleanup := setupTest(t, appID, "int-test", testValue)
-	defer cleanup()
-
-	assertKeyExists(t, appID, "int-test", true)
-
-	// Type mismatch - should error
-	_, err := GetBool(appID, "int-test")
-	testutil.AssertError(t, err, "non-bool value")
-
-	value, err := GetInt(appID, "int-test")
-	testutil.AssertNoError(t, err, "GetInt")
-	if value != testValue {
-		t.Fatalf("expected %d, got %d", testValue, value)
-	}
-}
-
-func TestGetFloat(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	testValue := 3.14159
-
-	cleanup := setupTest(t, appID, "float-test", testValue)
-	defer cleanup()
-
-	assertKeyExists(t, appID, "float-test", true)
-
-	// Type mismatch - should error
-	_, err := GetData(appID, "float-test")
-	testutil.AssertError(t, err, "non-data value")
-
-	value, err := GetFloat(appID, "float-test")
-	testutil.AssertNoError(t, err, "GetFloat")
-
-	if !testutil.ValuesEqualApprox(testValue, value) {
-		t.Fatalf("expected %f, got %f", testValue, value)
-	}
-}
-
-func TestGetBool(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	testValue := true
-
-	cleanup := setupTest(t, appID, "bool-test", testValue)
-	defer cleanup()
-
-	assertKeyExists(t, appID, "bool-test", true)
-
-	// Type mismatch - should error
-	_, err := GetDate(appID, "bool-test")
-	testutil.AssertError(t, err, "non-date value")
-
-	value, err := GetBool(appID, "bool-test")
-	testutil.AssertNoError(t, err, "GetBool")
-	if value != testValue {
-		t.Fatalf("expected %t, got %t", testValue, value)
-	}
-}
-
-func TestGetDate(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	// Use a fixed time for deterministic testing
-	testValue := time.Date(2024, 10, 15, 12, 30, 45, 123456000, time.UTC)
-
-	cleanup := setupTest(t, appID, "date-test", testValue)
-	defer cleanup()
-
-	assertKeyExists(t, appID, "date-test", true)
-
-	// Type mismatch - should error
-	_, err := GetMap(appID, "date-test")
-	testutil.AssertError(t, err, "non-map value")
-
-	value, err := GetDate(appID, "date-test")
-	testutil.AssertNoError(t, err, "GetDate")
-
-	if !testutil.ValuesEqualApprox(testValue, value) {
-		t.Fatalf("expected %v, got %v", testValue, value)
-	}
-}
-
-func TestGetSlice(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
+// TestGetTyped tests all typed getter functions using a table-driven approach
+func TestGetTyped(t *testing.T) {
 	testTime := time.Date(2024, 10, 15, 12, 30, 45, 123456000, time.UTC)
-	testValue := []any{int64(123), 3.14159, true, testTime}
 
-	cleanup := setupTest(t, appID, "slice-test", testValue)
-	defer cleanup()
+	tests := []struct {
+		name           string
+		key            string
+		value          any
+		getter         func(appID, key string) (any, error)
+		wrongGetter    func(appID, key string) (any, error)
+		wrongGetterErr string
+		checkEqual     func(expected, actual any) bool
+	}{
+		{
+			name:           "string value",
+			key:            "test-string",
+			value:          "hello world",
+			getter:         func(appID, key string) (any, error) { return GetStr(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetInt(appID, key) },
+			wrongGetterErr: "non-int value",
+			checkEqual: func(expected, actual any) bool {
+				return expected.(string) == actual.(string)
+			},
+		},
+		{
+			name:           "int value",
+			key:            "test-int",
+			value:          int64(42),
+			getter:         func(appID, key string) (any, error) { return GetInt(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetBool(appID, key) },
+			wrongGetterErr: "non-bool value",
+			checkEqual: func(expected, actual any) bool {
+				return expected.(int64) == actual.(int64)
+			},
+		},
+		{
+			name:           "float value",
+			key:            "test-float",
+			value:          3.14159,
+			getter:         func(appID, key string) (any, error) { return GetFloat(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetData(appID, key) },
+			wrongGetterErr: "non-data value",
+			checkEqual: func(expected, actual any) bool {
+				return testutil.ValuesEqualApprox(expected, actual)
+			},
+		},
+		{
+			name:           "bool value",
+			key:            "test-bool",
+			value:          true,
+			getter:         func(appID, key string) (any, error) { return GetBool(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetDate(appID, key) },
+			wrongGetterErr: "non-date value",
+			checkEqual: func(expected, actual any) bool {
+				return expected.(bool) == actual.(bool)
+			},
+		},
+		{
+			name:           "date value",
+			key:            "test-date",
+			value:          testTime,
+			getter:         func(appID, key string) (any, error) { return GetDate(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetMap(appID, key) },
+			wrongGetterErr: "non-map value",
+			checkEqual: func(expected, actual any) bool {
+				return testutil.ValuesEqualApprox(expected, actual)
+			},
+		},
+		{
+			name:           "slice value",
+			key:            "test-slice",
+			value:          []any{int64(123), 3.14159, true, testTime},
+			getter:         func(appID, key string) (any, error) { return GetSlice(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetStr(appID, key) },
+			wrongGetterErr: "non-string value",
+			checkEqual: func(expected, actual any) bool {
+				return testutil.ValuesEqualApprox(expected, actual)
+			},
+		},
+		{
+			name:           "data value",
+			key:            "test-data",
+			value:          []byte("hello world"),
+			getter:         func(appID, key string) (any, error) { return GetData(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetFloat(appID, key) },
+			wrongGetterErr: "non-float value",
+			checkEqual: func(expected, actual any) bool {
+				return reflect.DeepEqual(expected, actual)
+			},
+		},
+		{
+			name: "map value",
+			key:  "test-map",
+			value: map[string]any{
+				"string": "hello",
+				"number": int64(456),
+				"float":  2.71828,
+				"bool":   false,
+				"time":   testTime,
+			},
+			getter:         func(appID, key string) (any, error) { return GetMap(appID, key) },
+			wrongGetter:    func(appID, key string) (any, error) { return GetSlice(appID, key) },
+			wrongGetterErr: "non-slice value",
+			checkEqual: func(expected, actual any) bool {
+				return testutil.ValuesEqualApprox(expected, actual)
+			},
+		},
+	}
 
-	assertKeyExists(t, appID, "slice-test", true)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanup := setupTest(t, testAppID, tt.key, tt.value)
+			defer cleanup()
 
-	// Type mismatch - should error
-	_, err := GetStr(appID, "slice-test")
-	testutil.AssertError(t, err, "non-string value")
+			// Verify key exists
+			assertKeyExists(t, testAppID, tt.key, true)
 
-	value, err := GetSlice(appID, "slice-test")
-	testutil.AssertNoError(t, err, "GetSlice")
+			// Test correct getter
+			got, err := tt.getter(testAppID, tt.key)
+			testutil.AssertNoError(t, err, "correct getter")
+			if !tt.checkEqual(tt.value, got) {
+				t.Errorf("value mismatch: expected %v, got %v", tt.value, got)
+			}
 
-	if !testutil.ValuesEqualApprox(testValue, value) {
-		t.Fatalf("expected %v, got %v", testValue, value)
+			// Test wrong getter (type mismatch)
+			_, err = tt.wrongGetter(testAppID, tt.key)
+			testutil.AssertError(t, err, tt.wrongGetterErr)
+		})
 	}
 }
 
-func TestGetData(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	testValue := []byte("hello world")
+// TestGetErrors tests error conditions for Get operations
+func TestGetErrors(t *testing.T) {
+	t.Run("missing key", func(t *testing.T) {
+		_, err := Get(testAppID, "this-key-does-not-exist")
+		testutil.AssertError(t, err, "missing key")
+	})
 
-	cleanup := setupTest(t, appID, "data-test", testValue)
-	defer cleanup()
+	t.Run("empty key name", func(t *testing.T) {
+		_, err := Get(testAppID, "")
+		testutil.AssertError(t, err, "empty key name")
+	})
 
-	assertKeyExists(t, appID, "data-test", true)
+	t.Run("query errors", func(t *testing.T) {
+		t.Run("non-existent field", func(t *testing.T) {
+			_, err := Get(testAppID, "userData/nonexistent")
+			testutil.AssertError(t, err, "non-existent field should return error")
+		})
 
-	// Type mismatch - should error
-	_, err := GetFloat(appID, "data-test")
-	testutil.AssertError(t, err, "non-float value")
+		t.Run("non-existent root key", func(t *testing.T) {
+			_, err := Get(testAppID, "nonexistent/name")
+			testutil.AssertError(t, err, "non-existent root key should return error")
+		})
 
-	value, err := GetData(appID, "data-test")
-	testutil.AssertNoError(t, err, "GetData")
-	if !reflect.DeepEqual(value, testValue) {
-		t.Fatalf("expected %v, got %v", testValue, value)
-	}
+		t.Run("invalid JSONPath", func(t *testing.T) {
+			_, err := Get(testAppID, "userData/name[0]")
+			testutil.AssertError(t, err, "invalid JSONPath should return error")
+		})
+	})
 }
 
-func TestGetMap(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-	testTime := time.Date(2024, 10, 15, 12, 30, 45, 123456000, time.UTC)
-	testValue := map[string]any{
-		"string": "hello",
-		"number": int64(456),
-		"float":  2.71828,
-		"bool":   false,
-		"time":   testTime,
-	}
-
-	cleanup := setupTest(t, appID, "map-test", testValue)
-	defer cleanup()
-
-	assertKeyExists(t, appID, "map-test", true)
-
-	// Type mismatch - should error
-	_, err := GetSlice(appID, "map-test")
-	testutil.AssertError(t, err, "non-slice value")
-
-	value, err := GetMap(appID, "map-test")
-	testutil.AssertNoError(t, err, "GetMap")
-
-	if !testutil.ValuesEqualApprox(testValue, value) {
-		t.Fatalf("expected %v, got %v", testValue, value)
-	}
-}
-
-func TestGetMissingKey(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Test getting a key that doesn't exist
-	_, err := Get(appID, "this-key-does-not-exist")
-	testutil.AssertError(t, err, "missing key")
-}
-
-func TestGetEmptyKeyName(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Test empty key name
-	_, err := Get(appID, "")
-	testutil.AssertError(t, err, "empty key name")
-}
-
+// TestQuery tests JSON Pointer query functionality
 func TestQuery(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
 	testData := map[string]any{
 		"name": "Jane Doe",
-		"age":  30,
+		"age":  int64(30),
 		"city": "Anytown",
 		"items": []any{
 			"first",
@@ -237,93 +192,48 @@ func TestQuery(t *testing.T) {
 		},
 	}
 
-	cleanup := setupTest(t, appID, "bio", testData)
+	cleanup := setupTest(t, testAppID, "bio", testData)
 	defer cleanup()
 
-	t.Run("Simple field access", func(t *testing.T) {
-		value, err := Get(appID, "bio/name")
-		testutil.AssertNoError(t, err, "get user name")
-		if value != "Jane Doe" {
-			t.Errorf("expected 'Jane Doe', got %v", value)
-		}
-	})
-
-	t.Run("Numeric field access", func(t *testing.T) {
-		value, err := Get(appID, "bio/age")
-		testutil.AssertNoError(t, err, "get user age")
-		if !testutil.ValuesEqualApprox(int64(30), value) {
-			t.Fatalf("expected 30, got %v", value)
-		}
-	})
-
-	t.Run("Root object access", func(t *testing.T) {
-		value, err := Get(appID, "bio")
-		testutil.AssertNoError(t, err, "get root object")
-		if !testutil.ValuesEqualApprox(testData, value) {
-			t.Fatalf("expected %v, got %v", testData, value)
-		}
-	})
-
-	t.Run("Array access", func(t *testing.T) {
-		value, err := Get(appID, "bio/items/0")
-		testutil.AssertNoError(t, err, "get first item")
-		if value != "first" {
-			t.Fatalf("expected 'first', got %v", value)
-		}
-	})
-
-	t.Run("Nested array access", func(t *testing.T) {
-		value, err := Get(appID, "bio/pets/0/name")
-		testutil.AssertNoError(t, err, "get first pet name")
-		if value != "Fluffy" {
-			t.Fatalf("expected 'Fluffy', got %v", value)
-		}
-	})
-}
-
-func TestGetQueryErrors(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	t.Run("Non-existent field", func(t *testing.T) {
-		_, err := Get(appID, "userData/nonexistent")
-		testutil.AssertError(t, err, "non-existent field should return error")
-	})
-
-	t.Run("Non-existent root key", func(t *testing.T) {
-		_, err := Get(appID, "nonexistent/name")
-		testutil.AssertError(t, err, "non-existent root key should return error")
-	})
-
-	t.Run("Invalid JSONPath", func(t *testing.T) {
-		_, err := Get(appID, "userData/name[0]")
-		testutil.AssertError(t, err, "invalid JSONPath should return error")
-	})
-}
-
-func TestGetZ(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	testData := map[string]any{
-		"name": "Jane Doe",
-		"age":  30,
-		"city": "Anytown",
-		"items": []any{
-			"first",
-			"second",
-			"third",
+	tests := []struct {
+		name     string
+		path     string
+		expected any
+	}{
+		{
+			name:     "simple field access",
+			path:     "bio/name",
+			expected: "Jane Doe",
 		},
-		"pets": []any{
-			map[string]any{
-				"name": "Fluffy",
-				"type": "dog",
-			},
-			map[string]any{
-				"name": "Whiskers",
-				"type": "cat",
-			},
+		{
+			name:     "numeric field access",
+			path:     "bio/age",
+			expected: int64(30),
+		},
+		{
+			name:     "root object access",
+			path:     "bio",
+			expected: testData,
+		},
+		{
+			name:     "array element access",
+			path:     "bio/items/0",
+			expected: "first",
+		},
+		{
+			name:     "nested array field access",
+			path:     "bio/pets/0/name",
+			expected: "Fluffy",
 		},
 	}
 
-	cleanup := setupTest(t, appID, "z-user-data", testData)
-	defer cleanup()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			value, err := Get(testAppID, tt.path)
+			testutil.AssertNoError(t, err, "get "+tt.path)
+			if !testutil.ValuesEqualApprox(tt.expected, value) {
+				t.Errorf("expected %v, got %v", tt.expected, value)
+			}
+		})
+	}
 }

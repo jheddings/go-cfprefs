@@ -7,214 +7,289 @@ import (
 	"github.com/jheddings/go-cfprefs/testutil"
 )
 
-// Note: Test helpers are defined in get_test.go since they're shared
+// TestSetOperations tests various Set operations
+func TestSetOperations(t *testing.T) {
+	t.Run("basic set and get", func(t *testing.T) {
+		key := "test-basic-set"
+		err := Set(testAppID, key, "hello world")
+		testutil.AssertNoError(t, err, "set simple value")
+		defer Delete(testAppID, key)
 
-func TestSet(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
+		// Verify the value was set correctly
+		value, err := Get(testAppID, key)
+		testutil.AssertNoError(t, err, "get value")
 
-	// Test setting a simple value
-	err := Set(appID, "test-key", "hello world")
-	testutil.AssertNoError(t, err, "set simple value")
-	defer Delete(appID, "test-key")
-
-	// Verify the value was set correctly
-	value, err := Get(appID, "test-key")
-	testutil.AssertNoError(t, err, "get value")
-
-	strValue, ok := value.(string)
-	if !ok {
-		t.Fatalf("value is not a string: got %T", value)
-	}
-	if strValue != "hello world" {
-		t.Fatalf("value does not match: expected 'hello world', got '%s'", strValue)
-	}
-
-	// Test replacing an existing value
-	err = Set(appID, "test-key", int64(42))
-	testutil.AssertNoError(t, err, "replace value")
-
-	value, err = Get(appID, "test-key")
-	testutil.AssertNoError(t, err, "get replaced value")
-
-	intValue, ok := value.(int64)
-	if !ok {
-		t.Fatalf("value is not an int64: got %T", value)
-	}
-	if intValue != 42 {
-		t.Fatalf("value does not match: expected 42, got %d", intValue)
-	}
-}
-
-func TestSetNested(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Test setting a value in a nested path that doesn't exist yet
-	err := Set(appID, "set-nested-test/level1/level1_1/value", "hello from nested path")
-	testutil.AssertNoError(t, err, "set nested path")
-	defer Delete(appID, "set-nested-test")
-
-	// Add a sibling branch
-	err = Set(appID, "set-nested-test/neighbor/level1_1/value", "hello from neighbor")
-	testutil.AssertNoError(t, err, "set sibling branch")
-
-	// Verify the expected structure was created
-	expected := map[string]any{
-		"level1": map[string]any{
-			"level1_1": map[string]any{
-				"value": "hello from nested path",
-			},
-		},
-		"neighbor": map[string]any{
-			"level1_1": map[string]any{
-				"value": "hello from neighbor",
-			},
-		},
-	}
-
-	root, err := GetMap(appID, "set-nested-test")
-	testutil.AssertNoError(t, err, "get root dictionary")
-
-	if !reflect.DeepEqual(root, expected) {
-		t.Fatalf("root value does not match expected: expected %v, got %v", expected, root)
-	}
-
-	// Test adding another value to the same nested structure
-	err = Set(appID, "set-nested-test/level1/level1_1/another", int64(42))
-	testutil.AssertNoError(t, err, "set another value in existing path")
-
-	// Verify both values exist
-	expected = map[string]any{
-		"level1": map[string]any{
-			"level1_1": map[string]any{
-				"value":   "hello from nested path",
-				"another": int64(42),
-			},
-		},
-		"neighbor": map[string]any{
-			"level1_1": map[string]any{
-				"value": "hello from neighbor",
-			},
-		},
-	}
-
-	root, err = GetMap(appID, "set-nested-test")
-	testutil.AssertNoError(t, err, "get root dictionary")
-
-	if !reflect.DeepEqual(root, expected) {
-		t.Fatalf("root value does not match expected: expected %v, got %v", expected, root)
-	}
-}
-
-func TestSetQArrayOperations(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
-
-	// Clean up any previous test data
-	Delete(appID, "array-test")
-	defer Delete(appID, "array-test")
-
-	// Create an array with some initial items
-	err := Set(appID, "array-test", map[string]any{
-		"items": []any{"first", "second", "third"},
+		strValue, ok := value.(string)
+		if !ok {
+			t.Fatalf("value is not a string: got %T", value)
+		}
+		if strValue != "hello world" {
+			t.Errorf("value does not match: expected 'hello world', got '%s'", strValue)
+		}
 	})
-	testutil.AssertNoError(t, err, "set initial array")
 
-	// Test updating an array element
-	err = Set(appID, "array-test/items/1", "updated-second")
-	testutil.AssertNoError(t, err, "update array element")
+	t.Run("replace existing value", func(t *testing.T) {
+		key := "test-replace"
+		// Set initial value
+		err := Set(testAppID, key, "initial value")
+		testutil.AssertNoError(t, err, "set initial value")
+		defer Delete(testAppID, key)
 
-	value, err := Get(appID, "array-test/items/1")
-	testutil.AssertNoError(t, err, "get updated array element")
-	if value.(string) != "updated-second" {
-		t.Fatalf("array element not updated: expected 'updated-second', got '%s'", value.(string))
-	}
+		// Replace with different type
+		err = Set(testAppID, key, int64(42))
+		testutil.AssertNoError(t, err, "replace value")
 
-	// Test appending to array
-	err = Set(appID, "array-test/items/~]", "fourth")
-	testutil.AssertNoError(t, err, "append to array")
+		value, err := Get(testAppID, key)
+		testutil.AssertNoError(t, err, "get replaced value")
 
-	items, err := GetSlice(appID, "array-test/items")
-	testutil.AssertNoError(t, err, "get array after append")
-	if len(items) != 4 {
-		t.Fatalf("array length incorrect: expected 4, got %d", len(items))
-	}
-	if items[3].(string) != "fourth" {
-		t.Fatalf("appended value incorrect: expected 'fourth', got '%s'", items[3].(string))
-	}
+		intValue, ok := value.(int64)
+		if !ok {
+			t.Fatalf("value is not an int64: got %T", value)
+		}
+		if intValue != 42 {
+			t.Errorf("value does not match: expected 42, got %d", intValue)
+		}
+	})
 
-	// test appending a new element with a new field
-	err = Set(appID, "array-test/pets/~]/name", "Fido")
-	testutil.AssertNoError(t, err, "append new element")
+	t.Run("nested path creation", func(t *testing.T) {
+		rootKey := "test-nested-creation"
+		defer Delete(testAppID, rootKey)
 
-	err = Set(appID, "array-test/pets/~]/name", "Spot")
-	testutil.AssertNoError(t, err, "append new element")
+		// Set value in non-existent nested path
+		err := Set(testAppID, rootKey+"/level1/level2/value", "deeply nested")
+		testutil.AssertNoError(t, err, "set deeply nested path")
 
-	items, err = GetSlice(appID, "array-test/pets")
-	testutil.AssertNoError(t, err, "get array after append")
+		// Add sibling branch
+		err = Set(testAppID, rootKey+"/sibling/level2/value", "sibling value")
+		testutil.AssertNoError(t, err, "set sibling branch")
 
-	if !reflect.DeepEqual(items, []any{map[string]any{"name": "Fido"}, map[string]any{"name": "Spot"}}) {
-		t.Fatalf("array does not match expected: found %v", items)
-	}
+		// Verify structure
+		expected := map[string]any{
+			"level1": map[string]any{
+				"level2": map[string]any{
+					"value": "deeply nested",
+				},
+			},
+			"sibling": map[string]any{
+				"level2": map[string]any{
+					"value": "sibling value",
+				},
+			},
+		}
 
-	// test appending to a new array
-	err = Set(appID, "array-test/deep-array/~]/children/~]", "child-1")
-	testutil.AssertNoError(t, err, "append to new array")
+		root, err := GetMap(testAppID, rootKey)
+		testutil.AssertNoError(t, err, "get root map")
 
-	err = Set(appID, "array-test/deep-array/0/children/~]", "child-2")
-	testutil.AssertNoError(t, err, "append child to new array")
+		if !reflect.DeepEqual(root, expected) {
+			t.Errorf("structure does not match expected: expected %v, got %v", expected, root)
+		}
+	})
 
-	// NOTE: the brackets are required when querying names with dashes
-	items, err = GetSlice(appID, "array-test/deep-array")
-	testutil.AssertNoError(t, err, "get deep-array")
-	if !reflect.DeepEqual(items, []any{map[string]any{"children": []any{"child-1", "child-2"}}}) {
-		t.Fatalf("array does not match expected: found %v", items)
-	}
+	t.Run("add to existing nested structure", func(t *testing.T) {
+		rootKey := "test-nested-add"
+		defer Delete(testAppID, rootKey)
 
-	// Test array index out of bounds
-	err = Set(appID, "array-test/items/10", "should fail")
-	testutil.AssertError(t, err, "array index out of bounds")
-	err = Set(appID, "array-test/pets/3", "should fail")
-	testutil.AssertError(t, err, "array index out of bounds")
+		// Create initial structure
+		initial := map[string]any{
+			"existing": map[string]any{
+				"field": "value",
+			},
+		}
+		err := Set(testAppID, rootKey, initial)
+		testutil.AssertNoError(t, err, "set initial structure")
+
+		// Add new field to existing object
+		err = Set(testAppID, rootKey+"/existing/newField", int64(123))
+		testutil.AssertNoError(t, err, "add field to existing object")
+
+		// Verify both fields exist
+		existing, err := GetMap(testAppID, rootKey+"/existing")
+		testutil.AssertNoError(t, err, "get existing object")
+
+		expected := map[string]any{
+			"field":    "value",
+			"newField": int64(123),
+		}
+		if !reflect.DeepEqual(existing, expected) {
+			t.Errorf("object does not match expected: expected %v, got %v", expected, existing)
+		}
+	})
 }
 
-func TestSetQReplaceRoot(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
+// TestSetArrayOperations tests array-specific Set operations
+func TestSetArrayOperations(t *testing.T) {
+	t.Run("update array element", func(t *testing.T) {
+		rootKey := "test-array-update"
+		defer Delete(testAppID, rootKey)
 
-	// Clean up any previous test data
-	Delete(appID, "replace-test")
-	defer Delete(appID, "replace-test")
+		// Create initial array
+		initial := map[string]any{
+			"items": []any{"first", "second", "third"},
+		}
+		err := Set(testAppID, rootKey, initial)
+		testutil.AssertNoError(t, err, "set initial array")
 
-	// Set initial value
-	err := Set(appID, "replace-test", map[string]any{"old": "value"})
-	testutil.AssertNoError(t, err, "set initial value")
+		// Update middle element
+		err = Set(testAppID, rootKey+"/items/1", "updated-second")
+		testutil.AssertNoError(t, err, "update array element")
 
-	// Replace entire root with $ or empty query
-	newValue := map[string]any{"new": "value"}
-	err = Set(appID, "replace-test", newValue)
-	testutil.AssertNoError(t, err, "replace root with $")
+		// Verify update
+		value, err := Get(testAppID, rootKey+"/items/1")
+		testutil.AssertNoError(t, err, "get updated element")
+		if value.(string) != "updated-second" {
+			t.Errorf("element not updated: expected 'updated-second', got '%s'", value.(string))
+		}
+	})
 
-	value, err := Get(appID, "replace-test")
-	testutil.AssertNoError(t, err, "get replaced value")
+	t.Run("append to existing array", func(t *testing.T) {
+		rootKey := "test-array-append"
+		defer Delete(testAppID, rootKey)
 
-	mapValue, ok := value.(map[string]any)
-	if !ok {
-		t.Fatalf("value is not a map: got %T", value)
-	}
-	if _, hasOld := mapValue["old"]; hasOld {
-		t.Fatal("old value still exists after replacement")
-	}
-	if mapValue["new"] != "value" {
-		t.Fatalf("new value incorrect: expected 'value', got '%v'", mapValue["new"])
-	}
+		// Create initial array
+		initial := map[string]any{
+			"items": []any{"one", "two"},
+		}
+		err := Set(testAppID, rootKey, initial)
+		testutil.AssertNoError(t, err, "set initial array")
+
+		// Append new element
+		err = Set(testAppID, rootKey+"/items/~]", "three")
+		testutil.AssertNoError(t, err, "append to array")
+
+		// Verify length and content
+		items, err := GetSlice(testAppID, rootKey+"/items")
+		testutil.AssertNoError(t, err, "get array after append")
+		
+		if len(items) != 3 {
+			t.Errorf("array length incorrect: expected 3, got %d", len(items))
+		}
+		if items[2].(string) != "three" {
+			t.Errorf("appended value incorrect: expected 'three', got '%s'", items[2].(string))
+		}
+	})
+
+	t.Run("append object to array", func(t *testing.T) {
+		rootKey := "test-array-append-object"
+		defer Delete(testAppID, rootKey)
+
+		// Start with empty preferences
+		err := Set(testAppID, rootKey, map[string]any{})
+		testutil.AssertNoError(t, err, "set empty root")
+
+		// Append objects with fields
+		err = Set(testAppID, rootKey+"/pets/~]/name", "Fido")
+		testutil.AssertNoError(t, err, "append first pet")
+
+		err = Set(testAppID, rootKey+"/pets/~]/name", "Spot")
+		testutil.AssertNoError(t, err, "append second pet")
+
+		// Verify result
+		pets, err := GetSlice(testAppID, rootKey+"/pets")
+		testutil.AssertNoError(t, err, "get pets array")
+
+		expected := []any{
+			map[string]any{"name": "Fido"},
+			map[string]any{"name": "Spot"},
+		}
+		if !reflect.DeepEqual(pets, expected) {
+			t.Errorf("pets array does not match expected: expected %v, got %v", expected, pets)
+		}
+	})
+
+	t.Run("nested array append", func(t *testing.T) {
+		rootKey := "test-nested-array-append"
+		defer Delete(testAppID, rootKey)
+
+		// Create nested array structure through append
+		err := Set(testAppID, rootKey+"/groups/~]/children/~]", "child-1")
+		testutil.AssertNoError(t, err, "append to nested array")
+
+		err = Set(testAppID, rootKey+"/groups/0/children/~]", "child-2")
+		testutil.AssertNoError(t, err, "append to existing nested array")
+
+		// Verify structure
+		groups, err := GetSlice(testAppID, rootKey+"/groups")
+		testutil.AssertNoError(t, err, "get groups")
+
+		expected := []any{
+			map[string]any{
+				"children": []any{"child-1", "child-2"},
+			},
+		}
+		if !reflect.DeepEqual(groups, expected) {
+			t.Errorf("nested array does not match expected: expected %v, got %v", expected, groups)
+		}
+	})
+
+	t.Run("array index out of bounds", func(t *testing.T) {
+		rootKey := "test-array-bounds"
+		defer Delete(testAppID, rootKey)
+
+		// Create array with 3 elements
+		initial := map[string]any{
+			"items": []any{"a", "b", "c"},
+		}
+		err := Set(testAppID, rootKey, initial)
+		testutil.AssertNoError(t, err, "set initial array")
+
+		// Try to set beyond array bounds
+		err = Set(testAppID, rootKey+"/items/10", "should fail")
+		testutil.AssertError(t, err, "array index out of bounds")
+	})
 }
 
-func TestSetQNonObjectSegment(t *testing.T) {
-	appID := "com.jheddings.cfprefs.testing"
+// TestSetRootOperations tests operations on root keys
+func TestSetRootOperations(t *testing.T) {
+	t.Run("replace entire root", func(t *testing.T) {
+		rootKey := "test-root-replace"
+		defer Delete(testAppID, rootKey)
 
-	// Set a simple string value
-	cleanup := setupTest(t, appID, "simple-string", "hello")
-	defer cleanup()
+		// Set initial value
+		initial := map[string]any{"old": "value", "count": int64(1)}
+		err := Set(testAppID, rootKey, initial)
+		testutil.AssertNoError(t, err, "set initial value")
 
-	// Try to set a nested value through a non-object segment
-	err := Set(appID, "simple-string/nested/value", "should fail")
-	testutil.AssertError(t, err, "setting through non-object segment")
+		// Replace entire root
+		replacement := map[string]any{"new": "value", "count": int64(2)}
+		err = Set(testAppID, rootKey, replacement)
+		testutil.AssertNoError(t, err, "replace root")
+
+		// Verify replacement
+		value, err := Get(testAppID, rootKey)
+		testutil.AssertNoError(t, err, "get replaced value")
+
+		mapValue := value.(map[string]any)
+		if _, hasOld := mapValue["old"]; hasOld {
+			t.Error("old field still exists after replacement")
+		}
+		if mapValue["new"] != "value" {
+			t.Errorf("new field incorrect: expected 'value', got '%v'", mapValue["new"])
+		}
+		if mapValue["count"] != int64(2) {
+			t.Errorf("count incorrect: expected 2, got %v", mapValue["count"])
+		}
+	})
+}
+
+// TestSetErrors tests error conditions for Set operations
+func TestSetErrors(t *testing.T) {
+	t.Run("set through non-object segment", func(t *testing.T) {
+		rootKey := "test-non-object"
+		cleanup := setupTest(t, testAppID, rootKey, "string value")
+		defer cleanup()
+
+		// Try to set nested value through string
+		err := Set(testAppID, rootKey+"/nested/value", "should fail")
+		testutil.AssertError(t, err, "setting through non-object segment")
+	})
+
+	t.Run("invalid array operations", func(t *testing.T) {
+		rootKey := "test-invalid-array"
+		cleanup := setupTest(t, testAppID, rootKey, []any{"a", "b"})
+		defer cleanup()
+
+		// Try to set with invalid array index
+		err := Set(testAppID, rootKey+"/not-a-number", "should fail")
+		testutil.AssertError(t, err, "invalid array index")
+	})
 }
