@@ -105,7 +105,7 @@ func TestSetNested(t *testing.T) {
 	}
 }
 
-func TestSetQArrayOperations(t *testing.T) {
+func TestSetArrayOperations(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	// Clean up any previous test data
@@ -176,7 +176,7 @@ func TestSetQArrayOperations(t *testing.T) {
 	testutil.AssertError(t, err, "array index out of bounds")
 }
 
-func TestSetQReplaceRoot(t *testing.T) {
+func TestSetReplaceRoot(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	// Clean up any previous test data
@@ -207,7 +207,7 @@ func TestSetQReplaceRoot(t *testing.T) {
 	}
 }
 
-func TestSetQNonObjectSegment(t *testing.T) {
+func TestSetNonObjectSegment(t *testing.T) {
 	appID := "com.jheddings.cfprefs.testing"
 
 	// Set a simple string value
