@@ -79,6 +79,24 @@ CFArrayRef createCFArray(const void** values, CFIndex count) {
 CFDictionaryRef createCFDictionary(const void** keys, const void** values, CFIndex count) {
     return CFDictionaryCreate(kCFAllocatorDefault, keys, values, count, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 }
+
+CFDataRef serializeToBinaryPlist(CFTypeRef plistObject) {
+    CFErrorRef error = NULL;
+    CFDataRef data = CFPropertyListCreateData(
+        kCFAllocatorDefault,
+        plistObject,
+        kCFPropertyListBinaryFormat_v1_0,
+        0,
+        &error
+    );
+
+    if (error) {
+        CFRelease(error);
+        return NULL;
+    }
+
+    return data;
+}
 */
 import "C"
 
@@ -148,6 +166,9 @@ func convertGoToCFType(value any) (C.CFTypeRef, error) {
 
 	case map[string]any:
 		return convertMapToCF(v)
+
+	case *BinaryPlist:
+		return convertBinaryPlistToCF(v)
 	}
 
 	return nilCFType, CFTypeError().WithMsgF("unsupported Go type: %T", value)
@@ -296,4 +317,28 @@ func convertMapToCF(value map[string]any) (C.CFTypeRef, error) {
 	)
 
 	return C.CFTypeRef(dictRef), nil
+}
+
+// convertBinaryPlistToCF converts a BinaryPlist to CFData containing binary plist data
+func convertBinaryPlistToCF(value *BinaryPlist) (C.CFTypeRef, error) {
+	// If we have raw bytes, use them directly
+	if len(value.Raw) > 0 {
+		return convertBytesToCF(value.Raw), nil
+	}
+
+	// Otherwise, we need to serialize the value back to binary plist format
+	// First convert the value to a CFType
+	cfValue, err := convertGoToCFType(value.Value)
+	if err != nil {
+		return nilCFType, CFTypeError().Wrap(err).WithMsg("failed to convert BinaryPlist value")
+	}
+	defer safeCFRelease(cfValue)
+
+	// Serialize to binary plist
+	dataRef := C.serializeToBinaryPlist(cfValue)
+	if dataRef == C.CFDataRef(unsafe.Pointer(nil)) {
+		return nilCFType, CFTypeError().WithMsg("failed to serialize value to binary plist")
+	}
+
+	return C.CFTypeRef(dataRef), nil
 }

@@ -241,7 +241,7 @@ func convertCFDataToGo(dataRef C.CFDataRef) any {
 	if plist := C.tryDeserializePlist(dataRef); plist != nilCFType {
 		defer C.CFRelease(C.CFTypeRef(plist))
 		if value, err := convertCFTypeToGo(C.CFTypeRef(plist)); err == nil {
-			return value
+			return NewBinaryPlist(data, value)
 		}
 	}
 
