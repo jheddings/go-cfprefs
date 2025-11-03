@@ -23,8 +23,8 @@ var writeCmd = &cobra.Command{
 	Short: "Write a preference value",
 	Long: `Write a preference value for the specified application ID.
 
-Use the --query flag to apply JSONPath queries for more precise value setting
-within complex nested structures.`,
+The key can be a simple name or include a JSON Pointer path (e.g.,
+"config/server/port") to access nested values within the preference.`,
 	Args: cobra.ExactArgs(3),
 	Run:  doWriteCmd,
 }
@@ -37,14 +37,12 @@ func init() {
 	flags.BoolVar(&writeTypeFloat, "float", false, "Parse value as float")
 	flags.BoolVar(&writeTypeBool, "bool", false, "Parse value as boolean")
 	flags.BoolVar(&writeTypeDate, "date", false, "Parse value as date (ISO 8601 format)")
-	flags.StringP("query", "Q", "", "Apply JSONPath query for precise value setting")
 
 	rootCmd.AddCommand(writeCmd)
 }
 
 func doWriteCmd(cmd *cobra.Command, args []string) {
 	appID, key, valueStr := args[0], args[1], args[2]
-	query, _ := cmd.Flags().GetString("query")
 
 	// make sure only one type flag is set
 	typeCount := 0
@@ -72,17 +70,11 @@ func doWriteCmd(cmd *cobra.Command, args []string) {
 	log.Trace().
 		Str("appID", appID).
 		Str("key", key).
-		Str("query", query).
 		Any("value", value).
 		Type("type", value).
 		Msg("Writing preference")
 
-	var err error
-	if query == "" {
-		err = cfprefs.Set(appID, key, value)
-	} else {
-		err = cfprefs.SetQ(appID, key, query, value)
-	}
+	err := cfprefs.Set(appID, key, value)
 
 	if err == nil {
 		log.Info().Str("app", appID).Str("key", key).Any("value", value).Msg("Value saved successfully")

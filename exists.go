@@ -1,51 +1,52 @@
 package cfprefs
 
 import (
-	"errors"
-
+	"github.com/go-openapi/jsonpointer"
 	"github.com/jheddings/go-cfprefs/internal"
-	"github.com/theory/jsonpath"
 )
 
 // Exists checks if a preference key exists for the given application ID.
-// Returns true if the key exists, false otherwise.
-func Exists(appID, key string) (bool, error) {
-	return internal.Exists(appID, key)
-}
-
-// ExistsQ checks if a value exists using JSONPath syntax within a specific root key.
-// The JSONPath query is applied to the value stored under the rootKey.
-// Returns true if the query resolves to a valid value, false otherwise.
+//
+// The keypath can be a simple name or include a JSON Pointer path (e.g.,
+// "config/server/port") to access nested values within the preference.
 //
 // Example usage:
 //
-//	// Check if a nested value exists: $.user.name
-//	exists, err := ExistsQ("com.example.app", "userData", "$.user.name")
+//	// Check if a simple key exists
+//	exists, err := Exists("com.example.app", "username")
 //
-//	// Check if an array has items: $.items[0]
-//	exists, err := ExistsQ("com.example.app", "data", "$.items[0]")
+//	// Check if a nested value exists
+//	exists, err := Exists("com.example.app", "config/server/port")
 //
-//	// Check if filtered array has results: $.items[?(@.active == true)]
-//	exists, err := ExistsQ("com.example.app", "data", "$.items[?(@.active == true)]")
-func ExistsQ(appID, rootKey, query string) (bool, error) {
-	rootValue, err := internal.Get(appID, rootKey)
-
+// Returns true if the key exists, false otherwise.
+func Exists(appID, keypath string) (bool, error) {
+	kp, err := parseKeypath(keypath)
 	if err != nil {
-		if errors.Is(err, internal.ErrCFLookup) {
-			return false, nil
-		}
-		return false, err
+		return false, NewKeyPathError().Wrap(err).WithMsgF("invalid keypath: %s", keypath)
 	}
 
-	if query == "" || query == "$" {
-		return true, nil
-	}
-
-	path, err := jsonpath.Parse(query)
+	exists, err := internal.Exists(appID, kp.Key)
 	if err != nil {
-		return false, NewKeyPathError().Wrap(err).WithMsgF("invalid query: %s", query)
+		return false, NewInternalError().Wrap(err).WithMsgF("failed to check: %s", kp.Key)
 	}
 
-	results := path.Select(rootValue)
-	return len(results) > 0, nil
+	// look for a quick exit
+	if !exists || kp.IsRoot() {
+		return exists, nil
+	}
+
+	// rebuild the pointer path
+	ptr, err := jsonpointer.New(kp.Path)
+	if err != nil {
+		return false, NewKeyPathError().Wrap(err).WithMsgF("invalid pointer: %s", kp.Path)
+	}
+
+	// get the preference value
+	val, err := internal.Get(appID, kp.Key)
+	if err != nil {
+		return false, NewInternalError().Wrap(err).WithMsgF("failed to get value: %s", kp)
+	}
+
+	_, _, err = ptr.Get(val)
+	return err == nil, nil
 }
