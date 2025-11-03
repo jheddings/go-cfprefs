@@ -7,7 +7,7 @@ Go module wrapper for the `CFPreferences` API's in macOS.
 - Read and write macOS preferences using native Go types
 - Automatic type conversion between Go types and CoreFoundation types
 - Support for all common data types: strings, numbers, booleans, dates, arrays, dictionaries, and binary data
-- Use JSONPath expressions to search complext structures
+    - Use JSON Pointer paths to access nested structures
 
 ## Installation
 
@@ -24,6 +24,12 @@ import "github.com/jheddings/go-cfprefs"
 
 // Read a preference value
 value, err := cfprefs.Get("com.apple.finder", "ShowPathbar")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Read a nested value using JSON Pointer path
+value, err = cfprefs.Get("com.example.app", "config/server/port")
 if err != nil {
     log.Fatal(err)
 }
@@ -60,23 +66,43 @@ err = cfprefs.Set("com.example.app", "config", map[string]any{
     "fontSize": 14,
     "autoSave": true,
 })
+
+// Write a nested value using JSON Pointer path
+err = cfprefs.Set("com.example.app", "config/server/port", 8080)
 ```
 
 ### Deleting Preferences
 
 ```go
+// Delete a top-level key
 err := cfprefs.Delete("com.example.app", "username")
+
+// Delete a nested value using JSON Pointer path
+err = cfprefs.Delete("com.example.app", "config/server/port")
 ```
 
 ### Checking if a Key Exists
 
 ```go
+// Check for a top-level key
 exists, err := cfprefs.Exists("com.example.app", "username")
+
+// Check for a nested value using JSON Pointer path
+exists, err = cfprefs.Exists("com.example.app", "config/server/port")
 ```
 
-## Query Expressions
+## Path Syntax
 
-TODO - document usage
+Preference keys can be specified as simple names or as [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) paths to access nested values. Use `/` to separate object keys and array indices.
+
+### Examples
+
+- `settings` — top-level key
+- `user/name` — nested object field
+- `items/0` — first element of an array
+- `config/database/host` — deeply nested field
+
+For more details, see the [JSON Pointer RFC](https://datatracker.ietf.org/doc/html/rfc6901).
 
 ## Command-Line Interface
 
