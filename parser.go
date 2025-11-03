@@ -1,13 +1,7 @@
 package cfprefs
 
 import (
-	"errors"
 	"strings"
-)
-
-var (
-	// ErrInvalidJSONPath is returned when an invalid JSONPath is provided
-	ErrInvalidJSONPath = errors.New("invalid JSONPath expression")
 )
 
 // keypath represents a key and an optional JSON Pointer path.

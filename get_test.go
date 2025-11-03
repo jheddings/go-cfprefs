@@ -294,9 +294,9 @@ func TestGetQueryErrors(t *testing.T) {
 		testutil.AssertError(t, err, "non-existent root key should return error")
 	})
 
-	t.Run("Invalid JSONPath", func(t *testing.T) {
+	t.Run("Invalid JSON Pointer", func(t *testing.T) {
 		_, err := Get(appID, "userData/name[0]")
-		testutil.AssertError(t, err, "invalid JSONPath should return error")
+		testutil.AssertError(t, err, "invalid JSON Pointer should return error")
 	})
 }
 
