@@ -3,7 +3,7 @@ module github.com/jheddings/go-cfprefs
 go 1.25.5
 
 require (
-	github.com/go-openapi/jsonpointer v0.22.3
+	github.com/go-openapi/jsonpointer v0.22.4
 	github.com/pterm/pterm v0.12.82
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.2
