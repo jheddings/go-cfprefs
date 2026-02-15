@@ -10,17 +10,20 @@ on:
 
 jobs:
   test:
-    name: Run Go Unit Tests
+    name: Run Go Unit Tests (Go ${{ matrix.go-version }})
     runs-on: macos-latest
-    
+    strategy:
+      matrix:
+        go-version: ['1.24', '1.25', '1.26']
+
     steps:
       - name: Check out code
         uses: actions/checkout@v6
-      
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version: ${{ matrix.go-version }}
       
       - name: Download dependencies
         run: go mod download
