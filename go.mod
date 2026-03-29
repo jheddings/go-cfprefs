@@ -1,6 +1,6 @@
 module github.com/jheddings/go-cfprefs
 
-go 1.26.1
+go 1.26.0
 
 require (
 	github.com/go-openapi/jsonpointer v0.22.5
