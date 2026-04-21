@@ -7,7 +7,7 @@ toolchain go1.26.0
 require (
 	github.com/go-openapi/jsonpointer v0.22.5
 	github.com/pterm/pterm v0.12.83
-	github.com/rs/zerolog v1.35.0
+	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 )
